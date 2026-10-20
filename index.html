@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="1.0.5">
+    <meta name="app-version" content="1.0.6">
     <title>Mochila de Emergência Inteligente</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -422,7 +422,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT RECONSTRUÍDO E FUNCIONAL -->
+    <!-- SCRIPT FINAL ATUALIZADO (v1.0.6) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -596,7 +596,11 @@
 
         async function sincronizarSilencioso() {
             try {
-                var res = await fetch(scriptUrl + '?action=getAll', { signal: AbortSignal.timeout(5000) });
+                // cache: 'no-store' força o celular a ignorar o cache antigo e ler a nuvem real
+                var res = await fetch(scriptUrl + '?action=getAll', { 
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(5000) 
+                });
                 var data = await res.json();
                 if (data && data.status === 'ok' && data.db) {
                     if (Date.now() - lastUserActionTime > 10000) {
@@ -760,7 +764,7 @@
         function formatarIsoParaBr(isoStr) {
             if (!isoStr) return '';
             var p = isoStr.split('-');
-            if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
+            if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
             return isoStr;
         }
 

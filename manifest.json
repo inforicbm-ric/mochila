@@ -1,0 +1,23 @@
+{
+  "name": "Mochila de Emergência",
+  "short_name": "Mochila",
+  "description": "Aplicativo de Gestão da Mochila de Emergência Familiar",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#f96302",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

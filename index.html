@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Mude apenas aqui a versão para atualizar o app inteiro e o Service Worker -->
+    <meta name="app-version" content="1.0.2">
+    <title>Mochila de Emergência Inteligente</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f96302">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        foxit: {
+                            orange: '#f96302',
+                            hover: '#e05500',
+                            lightBg: '#f2f2f2',
+                            barBg: '#f8f8f8',
+                            border: '#d1d1d1',
+                            headerGray: '#cccccc',
+                            darkBg: '#1e1e1e',
+                            darkBar: '#2d2d2d',
+                            darkBorder: '#3f3f3f'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style> body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } </style>
+</head>
+<body class="bg-[#e8e8e8] dark:bg-foxit-darkBg text-slate-800 dark:text-slate-200 h-full flex flex-col transition-colors duration-200 text-sm">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-wrap" class="fixed inset-0 z-50 flex items-center justify-center bg-[#e8e8e8] dark:bg-foxit-darkBg p-4">
+        <div class="bg-white dark:bg-slate-800 border border-foxit-border dark:border-foxit-darkBorder rounded-lg p-6 w-full max-w-sm shadow-xl relative">
+            <div class="text-center mb-5">
+                <span class="inline-flex w-12 h-12 bg-foxit-orange text-white rounded-xl items-center justify-center text-xl shadow-md mb-2">
+                    <i class="fa-solid fa-briefcase"></i>
+                </span>
+                <h1 class="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">Mochila de Emergência</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Faça login para acessar o sistema</p>
+            </div>
+            
+            <div id="login-err" class="hidden bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 rounded p-2.5 text-xs mb-3 font-semibold"></div>
+            
+            <div class="space-y-3 text-xs mb-4">
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Usuário</label>
+                    <input type="text" id="l-user" placeholder="Digite seu usuário..." autocomplete="username" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-foxit-border dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:ring-1 focus:ring-foxit-orange" onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Senha</label>
+                    <input type="password" id="l-pass" placeholder="Digite sua senha..." autocomplete="current-password" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-foxit-border dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:ring-1 focus:ring-foxit-orange" onkeydown="if(event.key==='Enter')fazerLogin()">
+                </div>
+            </div>
+
+            <button onclick="fazerLogin()" id="btn-login" class="w-full py-2.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold text-xs rounded shadow-sm transition">
+                <i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema
+            </button>
+
+            <!-- Botão expansível de Configuração da URL -->
+            <div class="mt-4 pt-3 border-t border-foxit-border dark:border-slate-700 text-center">
+                <button type="button" onclick="toggleUrlSection()" class="text-[11px] text-slate-500 hover:text-foxit-orange font-semibold transition">
+                    <i class="fa-solid fa-gear mr-1"></i> Configurar URL do Google Sheets
+                </button>
+            </div>
+
+            <!-- Bloco expansível da URL -->
+            <div id="cfg-hint" class="mt-3 p-3 bg-slate-50 dark:bg-slate-700/50 border border-foxit-border dark:border-slate-600 rounded text-left hidden">
+                <p class="text-[11px] text-amber-700 dark:text-amber-400 font-semibold mb-1.5">URL do Web App (Google Apps Script):</p>
+                <input type="url" id="cfg-url-login" placeholder="https://script.google.com/macros/s/..." class="w-full px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border dark:border-slate-600 rounded text-[11px] text-slate-800 dark:text-white mb-2">
+                <button type="button" onclick="salvarUrlLogin()" class="w-full py-1 bg-foxit-orange hover:bg-foxit-hover text-white font-bold text-xs rounded transition">Salvar URL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APLICATIVO PRINCIPAL -->
+    <div id="main-app" class="h-full flex flex-col flex-1 overflow-hidden" style="display:none">
+        <header class="bg-[#f3f3f3] dark:bg-foxit-darkBar border-b border-foxit-border dark:border-foxit-darkBorder shadow-sm z-30">
+            <div class="px-4 py-1.5 bg-[#eaeaea] dark:bg-[#252525] border-b border-foxit-border dark:border-foxit-darkBorder flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-2">
+                    <span class="w-5 h-5 bg-foxit-orange text-white rounded flex items-center justify-center font-bold text-xs shadow-sm">
+                        <i class="fa-solid fa-file-pdf"></i>
+                    </span>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">Mochila de Emergência Inteligente</span>
+                    <span id="user-chip" class="text-[11px] bg-foxit-orange/20 text-foxit-orange font-bold px-2 py-0.5 rounded">👤 Usuário</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="sincronizar()" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Sincronizar agora">
+                        <i id="syncIcon" class="fa-solid fa-rotate"></i>
+                    </button>
+                    <button onclick="toggleDarkMode()" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Alternar Modo Escuro">
+                        <i id="themeIcon" class="fa-solid fa-moon"></i>
+                    </button>
+                    <button onclick="fazerLogout()" class="text-red-600 hover:text-red-700 transition" title="Sair do Sistema">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ribbon Toolbar -->
+            <div class="max-w-7xl mx-auto px-3 py-2 flex items-center justify-between gap-2 overflow-x-auto whitespace-nowrap scrollbar-none">
+                <div class="flex items-center space-x-1.5 shrink-0">
+                    <button onclick="toggleMobileSidebar()" class="md:hidden p-1.5 border border-foxit-border rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <button onclick="resetAllFilters()" class="inline-flex items-center bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-foxit-border dark:border-foxit-darkBorder rounded px-2.5 py-1.5 space-x-1 shadow-sm text-xs font-semibold text-slate-700 dark:text-slate-200 transition">
+                        <span class="text-foxit-orange font-bold rounded text-xs"><i class="fa-solid fa-house mr-1"></i>Início</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-1.5 shrink-0">
+                    <button onclick="openAddPersonModal()" class="inline-flex items-center px-2.5 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-semibold text-xs rounded border border-foxit-orange shadow-sm transition">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Nova Pessoa
+                    </button>
+                    <button onclick="openManageCategoriesModal()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-foxit-border dark:border-foxit-darkBorder hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded shadow-sm transition">
+                        <i class="fa-solid fa-tags mr-1 text-foxit-orange"></i> Categorias
+                    </button>
+                    <button onclick="openChecklistModal()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-foxit-border dark:border-foxit-darkBorder hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded shadow-sm transition">
+                        <i class="fa-solid fa-list-check mr-1 text-foxit-orange"></i> Checklist
+                    </button>
+                    <button id="btn-users-manage" onclick="openUsersModal()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-foxit-border dark:border-foxit-darkBorder hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded shadow-sm transition" title="Gerenciar Usuários">
+                        <i class="fa-solid fa-users text-foxit-orange mr-1"></i> Usuários
+                    </button>
+                    <button onclick="openSettingsModal()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-foxit-border dark:border-foxit-darkBorder hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded shadow-sm transition" title="Configurações">
+                        <i class="fa-solid fa-gear text-slate-600 dark:text-slate-300"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="flex-1 flex overflow-hidden relative">
+            <div id="sidebarBackdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/40 z-20 hidden md:hidden backdrop-blur-xs"></div>
+
+            <aside id="appSidebar" class="absolute md:relative inset-y-0 left-0 w-64 bg-[#f0f0f0] dark:bg-[#252525] border-r border-foxit-border dark:border-foxit-darkBorder flex flex-col z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-200 shadow-sm">
+                <div class="p-2.5 bg-[#e2e2e2] dark:bg-[#2d2d2d] border-b border-foxit-border dark:border-foxit-darkBorder flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400 flex items-center">
+                        <i class="fa-solid fa-folder-open mr-1.5 text-foxit-orange"></i> Mochilas Familiares
+                    </span>
+                    <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-white">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                
+                <div id="personTabs" class="space-y-1 p-2 overflow-y-auto flex-1"></div>
+
+                <div class="p-3 border-t border-foxit-border dark:border-foxit-darkBorder bg-[#e5e5e5] dark:bg-[#202020]">
+                    <div class="flex items-center justify-between mb-1 text-xs">
+                        <span class="font-medium text-slate-600 dark:text-slate-400">Status da Família</span>
+                        <span id="globalProgressText" class="font-bold text-slate-800 dark:text-slate-200">0%</span>
+                    </div>
+                    <div class="w-full bg-[#d0d0d0] dark:bg-slate-700 rounded-sm h-2 overflow-hidden border border-slate-300 dark:border-slate-600">
+                        <div id="globalProgressBar" class="bg-foxit-orange h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                        <span><i class="fa-solid fa-square-check text-emerald-600 mr-1"></i> <span id="statOkCount" class="font-bold">0</span> OK</span>
+                        <span><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> <span id="statPendCount" class="font-bold">0</span> Pend.</span>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="flex-1 flex flex-col overflow-y-auto p-2 sm:p-6 bg-[#e0e0e0] dark:bg-[#1a1a1a] min-h-0">
+                <div class="max-w-5xl mx-auto w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 shadow-md rounded-sm flex flex-col my-auto sm:my-0">
+                    
+                    <div class="bg-[#f5f5f5] dark:bg-[#2a2a2a] border-b border-foxit-border dark:border-foxit-darkBorder p-4 sm:p-5">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-clipboard-list text-foxit-orange text-lg"></i>
+                                    <h2 id="currentPersonName" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Carregando...</h2>
+                                    <span id="personBadge" class="px-2 py-0.5 text-[10px] font-bold bg-foxit-orange/15 text-foxit-orange border border-foxit-orange/30 rounded uppercase">Documento Ativo</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <button onclick="openAddItemModal()" class="inline-flex items-center px-2.5 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white text-xs font-semibold rounded shadow-sm transition">
+                                    <i class="fa-solid fa-plus mr-1"></i> Novo Item
+                                </button>
+                                <button onclick="duplicateCurrentPersonList()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-foxit-border dark:border-slate-600 text-xs font-semibold rounded shadow-sm transition">
+                                    <i class="fa-solid fa-copy mr-1 text-foxit-orange"></i> Duplicar
+                                </button>
+                                <button onclick="exportToPDF()" class="inline-flex items-center px-2.5 py-1.5 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-foxit-border dark:border-slate-600 text-xs font-semibold rounded shadow-sm transition">
+                                    <i class="fa-solid fa-file-pdf mr-1 text-foxit-orange"></i> PDF
+                                </button>
+                                <button id="btn-delete-backpack" onclick="deleteCurrentPerson()" class="px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-red-300 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded transition shadow-sm text-xs font-semibold">
+                                    <i class="fa-solid fa-trash mr-1"></i> Excluir
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mt-4">
+                            <div class="bg-white dark:bg-slate-800 p-2.5 rounded border border-foxit-border dark:border-foxit-darkBorder">
+                                <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Total Itens</div>
+                                <div id="metricTotal" class="text-lg font-bold text-slate-900 dark:text-white mt-0.5">0</div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-2.5 rounded border border-foxit-border dark:border-foxit-darkBorder">
+                                <div class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase">Prontos (OK)</div>
+                                <div id="metricOk" class="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">0</div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-2.5 rounded border border-foxit-border dark:border-foxit-darkBorder">
+                                <div class="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase">Pendentes</div>
+                                <div id="metricPend" class="text-lg font-bold text-amber-700 dark:text-amber-400 mt-0.5">0</div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-2.5 rounded border border-foxit-border dark:border-foxit-darkBorder">
+                                <div class="text-[11px] font-semibold text-red-700 dark:text-red-400 uppercase">Vencidos</div>
+                                <div id="metricExpired" class="text-lg font-bold text-red-700 dark:text-red-400 mt-0.5">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-[#fafafa] dark:bg-[#222222] border-b border-foxit-border dark:border-foxit-darkBorder flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400"><i class="fa-solid fa-magnifying-glass text-xs"></i></span>
+                                <input type="text" id="searchInput" oninput="filterItems()" placeholder="Pesquisar produto..." class="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border dark:border-slate-600 rounded text-xs text-slate-800 dark:text-white">
+                            </div>
+                            <select id="categoryFilter" onchange="filterItems()" class="w-full sm:w-auto bg-white dark:bg-slate-700 border border-foxit-border dark:border-slate-600 rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"></select>
+                        </div>
+
+                        <div class="flex items-center space-x-1 w-full sm:w-auto overflow-x-auto">
+                            <button onclick="setStatusFilter('TODAS')" id="btnFilterAll" class="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 text-white transition">Todos</button>
+                            <button onclick="setStatusFilter('OK')" id="btnFilterOk" class="px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition">OK</button>
+                            <button onclick="setStatusFilter('PENDENTE')" id="btnFilterPend" class="px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition">Pendentes</button>
+                            <button onclick="setStatusFilter('VENCIDO')" id="btnFilterVenc" class="px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition">Vencidos</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto w-full">
+                        <table class="min-w-full border-collapse">
+                            <thead>
+                                <tr class="bg-[#dcdcdc] dark:bg-[#333333] border-y border-slate-400 dark:border-slate-600 text-slate-800 dark:text-slate-200 select-none">
+                                    <th scope="col" class="px-3.5 py-3 text-left text-xs font-bold border-r border-slate-300 dark:border-slate-600 uppercase">Situação</th>
+                                    <th scope="col" class="px-3.5 py-3 text-left text-xs font-bold border-r border-slate-300 dark:border-slate-600 uppercase">Categoria</th>
+                                    <th scope="col" class="px-3.5 py-3 text-left text-xs font-bold border-r border-slate-300 dark:border-slate-600 uppercase">Produto / Item</th>
+                                    <th scope="col" class="px-3.5 py-3 text-center text-xs font-bold border-r border-slate-300 dark:border-slate-600 uppercase">Qtd</th>
+                                    <th scope="col" class="px-3.5 py-3 text-left text-xs font-bold border-r border-slate-300 dark:border-slate-600 uppercase">Validade & Status</th>
+                                    <th scope="col" class="px-3.5 py-3 text-right text-xs font-bold uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsTableBody" class="divide-y divide-slate-300 dark:divide-slate-700 bg-white dark:bg-slate-800 text-xs"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-2.5 bg-[#f0f0f0] dark:bg-[#252525] border-t border-foxit-border dark:border-foxit-darkBorder flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span>Sincronizado com Google Drive / Sheets</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODAIS -->
+    <div id="usersModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-lg w-full p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-foxit-border dark:border-slate-700">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-white uppercase flex items-center"><i class="fa-solid fa-users text-foxit-orange mr-2"></i> Gerenciar Usuários</h3>
+                <button onclick="closeUsersModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="saveUserSubmit(event)" class="space-y-3 text-xs mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 border border-foxit-border dark:border-slate-700 rounded">
+                <input type="hidden" id="editUserKey">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Usuário (Login)</label>
+                        <input type="text" id="u-input-login" required class="w-full px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" placeholder="ex: carlos">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
+                        <input type="text" id="u-input-nome" required class="w-full px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" placeholder="ex: Carlos Silva">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Perfil de Acesso</label>
+                        <select id="u-input-nivel" class="w-full px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white font-semibold">
+                            <option value="editor">Leitor / Editor (Sem Exclusão)</option>
+                            <option value="admin">Administrador (Acesso Total)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Senha</label>
+                        <input type="password" id="u-input-senha" placeholder="Digite a senha..." class="w-full px-2.5 py-1.5 bg-white dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="resetUserForm()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded">Limpar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold rounded shadow-sm">Salvar Usuário</button>
+                </div>
+            </form>
+            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Usuários Cadastrados:</div>
+            <div id="usersList" class="max-h-48 overflow-y-auto space-y-1.5 border border-foxit-border dark:border-slate-700 rounded p-2 bg-white dark:bg-slate-900/50"></div>
+            <div class="flex justify-end pt-3 mt-3 border-t border-foxit-border dark:border-slate-700">
+                <button type="button" onclick="closeUsersModal()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="categoriesModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-md w-full p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-foxit-border dark:border-slate-700">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-white uppercase flex items-center"><i class="fa-solid fa-tags text-foxit-orange mr-2"></i> Gerenciar Categorias</h3>
+                <button onclick="closeManageCategoriesModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="addNewCategory(event)" class="flex space-x-2 mb-4">
+                <input type="text" id="newCategoryInput" required placeholder="Nova Categoria..." class="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white">
+                <button type="submit" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white text-xs font-bold rounded transition"><i class="fa-solid fa-plus mr-1"></i> Adicionar</button>
+            </form>
+            <div id="categoriesList" class="max-h-56 overflow-y-auto space-y-1.5 border border-foxit-border dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-900/50"></div>
+            <div class="flex justify-end pt-3 mt-3 border-t border-foxit-border dark:border-slate-700">
+                <button type="button" onclick="closeManageCategoriesModal()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="itemModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-md w-full p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-foxit-border dark:border-slate-700">
+                <h3 id="modalTitle" class="text-sm font-bold text-slate-800 dark:text-white uppercase">Adicionar Item</h3>
+                <button onclick="closeItemModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="itemForm" onsubmit="saveItem(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="editItemId">
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-2">
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Produto</label>
+                        <input type="text" id="inputProduto" required class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-900 dark:text-white" placeholder="Ex: Garrafa d'Água">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Qtd</label>
+                        <input type="number" id="inputQuantidade" min="1" value="1" required class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-center text-slate-900 dark:text-white font-bold">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                    <select id="inputCategoria" class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs font-semibold text-slate-800 dark:text-white"></select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Situação</label>
+                    <select id="inputSituacao" class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs font-semibold text-slate-800 dark:text-white">
+                        <option value="PENDENTE">Pendente</option>
+                        <option value="OK">OK (Pronto)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Validade (Opcional)</label>
+                    <div class="flex gap-2">
+                        <input type="date" id="inputValidadeCalendar" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" onchange="document.getElementById('inputValidadeText').value = formatarIsoParaBr(this.value)">
+                        <input type="text" id="inputValidadeText" placeholder="DD/MM/AAAA ou escolha no lado" maxlength="10" class="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" oninput="mascaraDataValidade(this)">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t border-foxit-border dark:border-slate-700">
+                    <button type="button" onclick="closeItemModal()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold rounded shadow-sm">Salvar Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURAÇÕES COM VERSÃO AUTOMÁTICA -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-md w-full p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-foxit-border dark:border-slate-700">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-white uppercase flex items-center"><i class="fa-solid fa-gear text-foxit-orange mr-2"></i> Configurações e Google Sheets</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">URL do Web App (Google Apps Script)</label>
+                    <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/..." class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white">
+                </div>
+                <div class="flex items-center justify-between">
+                    <span id="cfg-txt" class="font-semibold text-slate-600 dark:text-slate-400">Status: Verificando...</span>
+                    <button onclick="salvarUrl()" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold rounded shadow-sm">Salvar e Testar</button>
+                </div>
+                <!-- Exibição Automática da Versão -->
+                <div class="pt-3 border-t border-foxit-border dark:border-slate-700 flex items-center justify-between text-slate-500 dark:text-slate-400">
+                    <span>Versão Atual do Aplicativo:</span>
+                    <span id="appVersionDisplay" class="font-bold text-foxit-orange bg-foxit-orange/10 px-2 py-0.5 rounded">Carregando...</span>
+                </div>
+            </div>
+            <div class="flex justify-end pt-3 mt-4 border-t border-foxit-border dark:border-slate-700">
+                <button type="button" onclick="closeSettingsModal()" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="checklistModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden flex-col z-50 overflow-y-auto p-3 sm:p-6">
+        <div class="max-w-5xl w-full mx-auto my-auto bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 flex flex-col min-h-[80vh]">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
+                <div class="flex items-center space-x-3">
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">CHECKLIST DA MOCHILA</h1>
+                    <span id="checklistPersonBadge" class="px-4 py-1.5 bg-foxit-orange text-white font-extrabold text-xs sm:text-sm rounded-full uppercase shadow-sm"></span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="bg-[#f0f4f8] dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-xl p-3 min-w-[220px]">
+                        <div class="flex justify-between items-center mb-1.5 text-[11px] font-bold">
+                            <span class="text-slate-500 dark:text-slate-400 uppercase tracking-wide">PROGRESSO DO PERFIL</span>
+                            <span id="checklistPctText" class="text-foxit-orange font-extrabold text-xs">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                            <div id="checklistProgressBar" class="bg-foxit-orange h-full transition-all duration-300 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div id="checklistCountText" class="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 text-right font-medium">0/0 itens verificados</div>
+                    </div>
+                    <button onclick="closeChecklistModal()" class="w-10 h-10 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 dark:text-slate-300 rounded-xl flex items-center justify-center transition shadow-xs">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="checklistCategoriesContainer" class="space-y-5 my-6 flex-1"></div>
+            <div class="pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span class="text-xs font-medium text-slate-400 dark:text-slate-500">Clique nas caixas de seleção para atualizar o status instantaneamente.</span>
+                <button onclick="closeChecklistModal()" class="px-5 py-2.5 bg-[#e2e8f0] hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition shadow-xs">
+                    Fechar Checklist
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DO APLICATIVO + REGISTRO DO SERVICE WORKER -->
+    <script>
+        // Registro do Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => {
+                        console.log('Service Worker registrado!', reg);
+                        // Verifica atualizações automaticamente quando o app ganha conexão/foco
+                        reg.onupdatefound = () => {
+                            const installingWorker = reg.installing;
+                            installingWorker.onstatechange = () => {
+                                if (installingWorker.state === 'installed') {
+                                    if (navigator.serviceWorker.controller) {
+                                        console.log('Nova versão disponível! Atualizando...');
+                                        window.location.reload();
+                                    }
+                                }
+                            };
+                        };
+                    })
+                    .catch(err => console.log('Erro no Service Worker:', err));
+            });
+        }
+
+        var categories = JSON.parse(localStorage.getItem('m_categories')) || ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
+        var db = JSON.parse(localStorage.getItem('emergency_backpacks_db')) || {};
+
+        var scriptUrl = localStorage.getItem('m_scriptUrl') || '';
+        var sessao = JSON.parse(localStorage.getItem('m_sessao') || 'null');
+        var currentPerson = "";
+        var statusFilter = "TODAS";
+        var autoSyncTimer = null;
+        var saveDebounceTimer = null;
+        var lastUserActionTime = 0; 
+        var isSaving = false;
+        var usersCache = [];
+
+        function isAdmin() { return sessao && sessao.nivel === 'admin'; }
+
+        // Puxa a versão automaticamente do <meta name="app-version">
+        function obterVersaoApp() {
+            var metaTag = document.querySelector('meta[name="app-version"]');
+            return metaTag ? metaTag.getAttribute('content') : '1.0.0';
+        }
+
+        function toggleUrlSection() {
+            var el = document.getElementById('cfg-hint');
+            el.classList.toggle('hidden');
+            if (!el.classList.contains('hidden')) {
+                document.getElementById('cfg-url-login').value = scriptUrl;
+            }
+        }
+
+        function salvarUrlLogin() {
+            var url = document.getElementById('cfg-url-login').value.trim();
+            if (!url.startsWith('https://script.google.com')) { alert('❌ URL inválida'); return; }
+            scriptUrl = url;
+            salvarLocal();
+            alert('✅ URL configurada com sucesso!');
+            document.getElementById('cfg-hint').classList.add('hidden');
+        }
+
+        function limparNomesInvalidos() {
+            var limpo = {};
+            for (var k in db) {
+                if (k.startsWith('{') || k.length > 50) continue;
+                limpo[k] = db[k];
+            }
+            db = limpo;
+            localStorage.setItem('emergency_backpacks_db', JSON.stringify(db));
+        }
+
+        window.addEventListener("DOMContentLoaded", function() {
+            limparNomesInvalidos();
+            if (scriptUrl) {
+                document.getElementById("cfg-url").value = scriptUrl;
+            }
+            if (sessao) {
+                iniciarApp();
+            }
+        });
+
+        function salvarLocal() {
+            localStorage.setItem('m_categories', JSON.stringify(categories));
+            localStorage.setItem('emergency_backpacks_db', JSON.stringify(db));
+            localStorage.setItem('m_scriptUrl', scriptUrl);
+        }
+
+        async function fazerLogin() {
+            var usuario = document.getElementById('l-user').value.trim();
+            var senha = document.getElementById('l-pass').value.trim();
+            if (!usuario || !senha) { mostrarErroLogin('Preencha usuário e senha.'); return; }
+
+            var btn = document.getElementById('btn-login');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Autenticando...';
+            btn.disabled = true;
+
+            if (scriptUrl) {
+                try {
+                    var res = await fetch(scriptUrl + '?action=login&usuario=' + encodeURIComponent(usuario) + '&senha=' + encodeURIComponent(senha));
+                    var data = await res.json();
+                    if (data && data.status === 'ok') {
+                        sessao = { nome: data.nome, nivel: data.nivel, token: data.token, usuario: data.usuario };
+                        localStorage.setItem('m_sessao', JSON.stringify(sessao));
+                        iniciarApp();
+                        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema';
+                        btn.disabled = false;
+                        return;
+                    } else {
+                        mostrarErroLogin(data.message || 'Usuário ou senha incorretos.');
+                        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema';
+                        btn.disabled = false;
+                        return;
+                    }
+                } catch(e){}
+            }
+
+            if (usuario.toLowerCase() === 'admin' && senha === 'admin') {
+                sessao = { nome: 'Administrador', nivel: 'admin', token: 'token_' + Date.now(), usuario: 'admin' };
+                localStorage.setItem('m_sessao', JSON.stringify(sessao));
+                iniciarApp();
+            } else {
+                if (!scriptUrl) {
+                    mostrarErroLogin('Configure a URL do Google Sheets no botão abaixo.');
+                } else {
+                    mostrarErroLogin('Erro de comunicação. Verifique a URL do Web App.');
+                }
+            }
+            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema';
+            btn.disabled = false;
+        }
+
+        function mostrarErroLogin(msg) {
+            var el = document.getElementById('login-err');
+            el.textContent = '❌ ' + msg;
+            el.classList.remove('hidden');
+        }
+
+        function fazerLogout() {
+            if (!confirm('Deseja sair do aplicativo?')) return;
+            sessao = null;
+            localStorage.removeItem('m_sessao');
+            clearInterval(autoSyncTimer);
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('login-wrap').style.display = 'flex';
+            document.getElementById('l-user').value = '';
+            document.getElementById('l-pass').value = '';
+        }
+
+        function aplicarPermissoesInterface() {
+            document.getElementById('user-chip').textContent = '👤 ' + sessao.nome + (isAdmin() ? ' (Admin)' : ' (Editor)');
+            var btnUsers = document.getElementById('btn-users-manage');
+            if (btnUsers) btnUsers.style.display = isAdmin() ? 'inline-flex' : 'none';
+            var btnDelBackpack = document.getElementById('btn-delete-backpack');
+            if (btnDelBackpack) btnDelBackpack.style.display = isAdmin() ? 'inline-flex' : 'none';
+        }
+
+        async function iniciarApp() {
+            document.getElementById('login-wrap').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            aplicarPermissoesInterface();
+            await sincronizar();
+            iniciarAutoSync();
+        }
+
+        function iniciarAutoSync() {
+            clearInterval(autoSyncTimer);
+            autoSyncTimer = setInterval(function() {
+                if (!scriptUrl || !navigator.onLine || isSaving || (Date.now() - lastUserActionTime < 5000)) return;
+                sincronizarSilencioso();
+            }, 2000);
+        }
+
+        async function sincronizarSilencioso() {
+            try {
+                var res = await fetch(scriptUrl + '?action=getAll', { signal: AbortSignal.timeout(5000) });
+                var data = await res.json();
+                if (data && data.status === 'ok' && data.db) {
+                    if (Date.now() - lastUserActionTime > 5000) {
+                        db = data.db;
+                        limparNomesInvalidos();
+                        if (Array.isArray(data.categories) && data.categories.length) {
+                            categories = data.categories;
+                        }
+                        salvarLocal();
+                        render();
+                    }
+                }
+            } catch(e){}
+        }
+
+        async function sincronizar() {
+            if (!scriptUrl) return;
+            var icon = document.getElementById('syncIcon');
+            if (icon) icon.classList.add('fa-spin');
+            await sincronizarSilencioso();
+            if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+        }
+
+        async function enviar(payload) {
+            if (!scriptUrl) return null;
+            isSaving = true;
+            try {
+                var res = await fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                isSaving = false;
+                return await res.json();
+            } catch(e) {
+                isSaving = false;
+                return null;
+            }
+        }
+
+        function saveDB(immediate) {
+            lastUserActionTime = Date.now();
+            salvarLocal();
+            clearTimeout(saveDebounceTimer);
+            
+            if (immediate) {
+                enviar({ action: 'saveAll', db: db, categories: categories });
+            } else {
+                saveDebounceTimer = setTimeout(function() {
+                    enviar({ action: 'saveAll', db: db, categories: categories });
+                }, 1500);
+            }
+        }
+
+        function render() {
+            limparNomesInvalidos();
+            var keys = Object.keys(db);
+            if (keys.length === 0) {
+                db["RICHARD RYAN"] = [];
+                keys = Object.keys(db);
+            }
+            if (!currentPerson || !keys.includes(currentPerson)) {
+                currentPerson = keys[0];
+            }
+            renderCategoryDropdowns();
+            renderSidebar();
+            renderPersonView();
+        }
+
+        function renderCategoryDropdowns() {
+            var filterSelect = document.getElementById('categoryFilter');
+            var inputSelect = document.getElementById('inputCategoria');
+            if(!filterSelect || !inputSelect) return;
+
+            var currentFilterVal = filterSelect.value || 'TODAS';
+            var currentInputVal = inputSelect.value || categories[0] || '';
+
+            filterSelect.innerHTML = `<option value="TODAS">Todas as Categorias</option>`;
+            inputSelect.innerHTML = '';
+
+            categories.forEach(cat => {
+                filterSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                inputSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+
+            filterSelect.value = categories.includes(currentFilterVal) ? currentFilterVal : 'TODAS';
+            inputSelect.value = categories.includes(currentInputVal) ? currentInputVal : (categories[0] || '');
+        }
+
+        function renderSidebar() {
+            var container = document.getElementById('personTabs');
+            if(!container) return;
+            container.innerHTML = '';
+
+            var totalItemsAll = 0, totalOkAll = 0;
+            var personKeys = Object.keys(db);
+
+            personKeys.forEach(person => {
+                var items = db[person] || [];
+                var total = items.length;
+                var okCount = items.filter(i => i.situacao === 'OK').length;
+                var pct = total > 0 ? Math.round((okCount / total) * 100) : 0;
+
+                totalItemsAll += total;
+                totalOkAll += okCount;
+
+                var isActive = person === currentPerson;
+                var btn = document.createElement('div');
+                btn.onclick = () => { currentPerson = person; render(); if(window.innerWidth < 768) toggleMobileSidebar(); };
+                btn.className = `w-full flex items-center justify-between px-3 py-2 rounded text-xs font-semibold cursor-pointer transition select-none ${isActive ? 'bg-foxit-orange text-white shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-[#e2e2e2] dark:hover:bg-[#333333]'}`;
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate"><i class="fa-solid fa-file-lines ${isActive ? 'text-white' : 'text-slate-500'}"></i><span class="truncate">${person}</span></div>
+                    <span class="text-[11px] px-1.5 rounded font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}">${pct}%</span>
+                `;
+                container.appendChild(btn);
+            });
+
+            var globalPct = totalItemsAll > 0 ? Math.round((totalOkAll / totalItemsAll) * 100) : 0;
+            document.getElementById('globalProgressText').innerText = globalPct + '%';
+            document.getElementById('globalProgressBar').style.width = globalPct + '%';
+            document.getElementById('statOkCount').innerText = totalOkAll;
+            document.getElementById('statPendCount').innerText = totalItemsAll - totalOkAll;
+        }
+
+        function sanitizarDataArmazenada(val) {
+            if (!val) return '';
+            var s = String(val).trim();
+            if (s.includes('GMT') || s.includes('Mon') || s.includes('Tue') || s.includes('Wed') || s.includes('Thu') || s.includes('Fri') || s.includes('Sat') || s.includes('Sun')) {
+                var d = new Date(s);
+                if (!isNaN(d.getTime())) {
+                    var ano = d.getFullYear();
+                    var mes = String(d.getMonth() + 1).padStart(2, '0');
+                    var dia = String(d.getDate()).padStart(2, '0');
+                    return ano + '-' + mes + '-' + dia;
+                }
+                return '';
+            }
+            return s;
+        }
+
+        function converterDataParaBr(dataStr) {
+            dataStr = sanitizarDataArmazenada(dataStr);
+            if (!dataStr) return '';
+            if (dataStr.includes('-') && dataStr.length === 10) {
+                var p = dataStr.split('-');
+                if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+            }
+            return dataStr;
+        }
+
+        function converterDataParaIso(dataStr) {
+            dataStr = sanitizarDataArmazenada(dataStr);
+            if (!dataStr) return '';
+            if (dataStr.includes('/') && dataStr.length === 10) {
+                var p = dataStr.split('/');
+                if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
+            }
+            return dataStr;
+        }
+
+        function formatarIsoParaBr(isoStr) {
+            if (!isoStr) return '';
+            var p = isoStr.split('-');
+            if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+            return isoStr;
+        }
+
+        function mascaraDataValidade(input) {
+            var v = input.value.replace(/\D/g, '');
+            if (v.length > 8) v = v.slice(0, 8);
+            if (v.length >= 5) {
+                var brVal = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                input.value = brVal;
+                if (v.length === 8) {
+                    var isoVal = v.slice(4, 8) + '-' + v.slice(2, 4) + '-' + v.slice(0, 2);
+                    document.getElementById('inputValidadeCalendar').value = isoVal;
+                }
+            } else if (v.length >= 3) {
+                input.value = v.slice(0, 2) + '/' + v.slice(2);
+            } else {
+                input.value = v;
+            }
+        }
+
+        function renderPersonView() {
+            document.getElementById('currentPersonName').innerText = currentPerson || "MOCHILA";
+            var items = db[currentPerson] || [];
+            var total = items.length;
+            var okCount = items.filter(i => i.situacao === 'OK').length;
+            var pendCount = total - okCount;
+            var expiredCount = 0;
+
+            items.forEach(i => {
+                var isoVal = converterDataParaIso(i.validade);
+                if (isoVal) {
+                    var today = new Date(); today.setHours(0,0,0,0);
+                    var expDate = new Date(isoVal + 'T00:00:00');
+                    if (Math.ceil((expDate - today) / (1000 * 60 * 60 * 24)) < 0) expiredCount++;
+                }
+            });
+
+            document.getElementById('metricTotal').innerText = total;
+            document.getElementById('metricOk').innerText = okCount;
+            document.getElementById('metricPend').innerText = pendCount;
+            document.getElementById('metricExpired').innerText = expiredCount;
+
+            var searchVal = document.getElementById('searchInput').value.toLowerCase();
+            var catVal = document.getElementById('categoryFilter').value;
+
+            var filtered = items.filter(item => {
+                var matchSearch = item.produto.toLowerCase().includes(searchVal);
+                var matchCat = catVal === 'TODAS' || item.categoria === catVal;
+                
+                var matchStatus = true;
+                var isoVal = converterDataParaIso(item.validade);
+                var isVencido = false;
+                if (isoVal) {
+                    var today = new Date(); today.setHours(0,0,0,0);
+                    var expDate = new Date(isoVal + 'T00:00:00');
+                    if (Math.ceil((expDate - today) / (1000 * 60 * 60 * 24)) < 0) isVencido = true;
+                }
+
+                if (statusFilter === 'OK') matchStatus = item.situacao === 'OK';
+                else if (statusFilter === 'PENDENTE') matchStatus = item.situacao === 'PENDENTE';
+                else if (statusFilter === 'VENCIDO') matchStatus = isVencido;
+
+                return matchSearch && matchCat && matchStatus;
+            });
+
+            var tbody = document.getElementById('itemsTableBody');
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-xs font-medium text-slate-400">Nenhum item encontrado.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach((item, idx) => {
+                var isOk = item.situacao === 'OK';
+                var qtd = item.quantidade || 1;
+                
+                var isoVal = converterDataParaIso(item.validade);
+                var badgeHtml = `<span class="text-slate-400 italic">Sem data</span>`;
+                
+                if (isoVal) {
+                    var today = new Date(); today.setHours(0,0,0,0);
+                    var expDate = new Date(isoVal + 'T00:00:00');
+                    var diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+                    var valBr = converterDataParaBr(isoVal);
+
+                    if (diffDays < 0) {
+                        var diasAtraso = Math.abs(diffDays);
+                        badgeHtml = `<span class="px-2 py-1 bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold">📅 ${valBr} (VENCIDO HÁ ${diasAtraso} ${diasAtraso === 1 ? 'DIA' : 'DIAS'})</span>`;
+                    } else if (diffDays === 0) {
+                        badgeHtml = `<span class="px-2 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-bold">📅 VENCE HOJE (${valBr})</span>`;
+                    } else {
+                        badgeHtml = `<span class="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[11px]">📅 ${valBr}</span>`;
+                    }
+                }
+
+                var deleteBtnHtml = isAdmin() ? `<button onclick="deleteItem('${item.id}')" class="p-1 text-slate-500 hover:text-red-600" title="Excluir"><i class="fa-solid fa-trash"></i></button>` : '';
+                var rowBg = idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-[#f7f7f7] dark:bg-[#282828]';
+                
+                var tr = document.createElement('tr');
+                tr.className = `${rowBg} border-b border-slate-200 dark:border-slate-700 text-xs`;
+                tr.innerHTML = `
+                    <td class="px-3.5 py-4 border-r border-slate-200 dark:border-slate-700">
+                        <button id="btn_status_${item.id}" onclick="toggleItemStatus('${item.id}')" class="px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
+                            ${isOk ? 'OK' : 'PENDENTE'}
+                        </button>
+                    </td>
+                    <td class="px-3.5 py-4 font-semibold text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-700">${item.categoria}</td>
+                    <td class="px-3.5 py-4 font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700">${item.produto}</td>
+                    <td class="px-3.5 py-4 text-center font-bold border-r border-slate-200 dark:border-slate-700"><span class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700">${qtd}</span></td>
+                    <td class="px-3.5 py-4 border-r border-slate-200 dark:border-slate-700">${badgeHtml}</td>
+                    <td class="px-3.5 py-4 text-right space-x-1">
+                        <button onclick="openEditItemModal('${item.id}')" class="p-1 text-slate-500 hover:text-foxit-orange" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                        ${deleteBtnHtml}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function setStatusFilter(status) {
+            statusFilter = status;
+            ['All', 'Ok', 'Pend', 'Venc'].forEach(s => {
+                var btn = document.getElementById('btnFilter' + s);
+                if (btn) {
+                    btn.className = 'px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition';
+                }
+            });
+            var activeId = 'btnFilterAll';
+            if (status === 'OK') activeId = 'btnFilterOk';
+            if (status === 'PENDENTE') activeId = 'btnFilterPend';
+            if (status === 'VENCIDO') activeId = 'btnFilterVenc';
+            
+            var activeBtn = document.getElementById(activeId);
+            if (activeBtn) {
+                activeBtn.className = 'px-2.5 py-1 text-xs font-bold rounded bg-slate-700 text-white transition';
+            }
+            renderPersonView();
+        }
+
+        function filterItems() { renderPersonView(); }
+        function resetAllFilters() { document.getElementById('searchInput').value = ''; document.getElementById('categoryFilter').value = 'TODAS'; setStatusFilter('TODAS'); }
+
+        function toggleItemStatus(id) {
+            lastUserActionTime = Date.now();
+            var items = db[currentPerson] || [];
+            var item = items.find(i => i.id === id);
+            if (item) {
+                item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
+                var isOk = item.situacao === 'OK';
+                
+                var btn = document.getElementById('btn_status_' + id);
+                if (btn) {
+                    btn.className = `px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`;
+                    btn.innerText = isOk ? 'OK' : 'PENDENTE';
+                }
+
+                var total = items.length;
+                var okCount = items.filter(i => i.situacao === 'OK').length;
+                document.getElementById('metricOk').innerText = okCount;
+                document.getElementById('metricPend').innerText = total - okCount;
+                
+                renderSidebar();
+                saveDB(false);
+            }
+        }
+
+        function toggleChecklistItem(id, labelEl) {
+            lastUserActionTime = Date.now();
+            var items = db[currentPerson] || [];
+            var item = items.find(i => i.id === id);
+            if (item) {
+                item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
+                var isOk = item.situacao === 'OK';
+
+                if (labelEl) {
+                    var spanText = labelEl.querySelector('.item-title');
+                    if (spanText) {
+                        if (isOk) {
+                            spanText.classList.add('line-through', 'text-slate-400', 'dark:text-slate-500');
+                            spanText.classList.remove('text-slate-700', 'dark:text-slate-200');
+                        } else {
+                            spanText.classList.remove('line-through', 'text-slate-400', 'dark:text-slate-500');
+                            spanText.classList.add('text-slate-700', 'dark:text-slate-200');
+                        }
+                    }
+                }
+
+                atualizarChecklistProgresso();
+                saveDB(false);
+            }
+        }
+
+        function atualizarChecklistProgresso() {
+            var items = db[currentPerson] || [];
+            var totalItems = items.length;
+            var okItems = items.filter(i => i.situacao === 'OK').length;
+            var pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
+
+            document.getElementById('checklistPctText').innerText = pct + '%';
+            document.getElementById('checklistProgressBar').style.width = pct + '%';
+            document.getElementById('checklistCountText').innerText = `${okItems}/${totalItems} itens verificados`;
+        }
+
+        function openAddItemModal() {
+            document.getElementById('modalTitle').innerText = 'Adicionar Item';
+            document.getElementById('editItemId').value = '';
+            document.getElementById('inputProduto').value = '';
+            document.getElementById('inputQuantidade').value = '1';
+            document.getElementById('inputValidadeCalendar').value = '';
+            document.getElementById('inputValidadeText').value = '';
+            document.getElementById('itemModal').classList.remove('hidden');
+            document.getElementById('itemModal').classList.add('flex');
+        }
+
+        function openEditItemModal(id) {
+            var item = (db[currentPerson] || []).find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('modalTitle').innerText = 'Editar Item';
+            document.getElementById('editItemId').value = item.id;
+            document.getElementById('inputProduto').value = item.produto;
+            document.getElementById('inputQuantidade').value = item.quantidade || 1;
+            document.getElementById('inputCategoria').value = item.categoria;
+            document.getElementById('inputSituacao').value = item.situacao;
+            
+            var isoVal = converterDataParaIso(item.validade);
+            document.getElementById('inputValidadeCalendar').value = isoVal || '';
+            document.getElementById('inputValidadeText').value = converterDataParaBr(isoVal || '');
+
+            document.getElementById('itemModal').classList.remove('hidden');
+            document.getElementById('itemModal').classList.add('flex');
+        }
+
+        function closeItemModal() { document.getElementById('itemModal').classList.remove('flex'); document.getElementById('itemModal').classList.add('hidden'); }
+
+        function saveItem(e) {
+            e.preventDefault();
+            var id = document.getElementById('editItemId').value;
+            var produto = document.getElementById('inputProduto').value;
+            var quantidade = parseInt(document.getElementById('inputQuantidade').value) || 1;
+            var categoria = document.getElementById('inputCategoria').value;
+            var situacao = document.getElementById('inputSituacao').value;
+            
+            var textVal = document.getElementById('inputValidadeText').value.trim();
+            var validade = converterDataParaIso(textVal);
+
+            if (!db[currentPerson]) db[currentPerson] = [];
+
+            if (id) {
+                var item = db[currentPerson].find(i => i.id === id);
+                if (item) { item.produto = produto; item.quantidade = quantidade; item.categoria = categoria; item.situacao = situacao; item.validade = validade; }
+            } else {
+                db[currentPerson].push({ id: currentPerson.toLowerCase() + '_' + Date.now(), produto, quantidade, categoria, situacao, validade });
+            }
+            closeItemModal();
+            saveDB(true);
+            render();
+        }
+
+        function deleteItem(id) {
+            if (!isAdmin()) { alert('Apenas administradores podem excluir itens.'); return; }
+            if (confirm("Remover este item?")) {
+                db[currentPerson] = (db[currentPerson] || []).filter(i => i.id !== id);
+                saveDB(true);
+                render();
+            }
+        }
+
+        function openAddPersonModal() {
+            var name = prompt("Nome da nova pessoa / dono da mochila:").trim().toUpperCase();
+            if (!name) return;
+            if (db[name]) { alert("Já existe."); return; }
+            db[name] = [];
+            currentPerson = name;
+            saveDB(true);
+            render();
+        }
+
+        function deleteCurrentPerson() {
+            if (!isAdmin()) { alert('Apenas administradores podem excluir mochilas.'); return; }
+            if (Object.keys(db).length <= 1) { alert("Mantenha pelo menos uma mochila."); return; }
+            if (confirm("Excluir esta mochila?")) {
+                delete db[currentPerson];
+                currentPerson = Object.keys(db)[0];
+                saveDB(true);
+                render();
+            }
+        }
+
+        function duplicateCurrentPersonList() {
+            var newName = prompt("Nome da nova mochila duplicada:").trim().toUpperCase();
+            if (!newName || db[newName]) return;
+            db[newName] = JSON.parse(JSON.stringify(db[currentPerson] || []));
+            currentPerson = newName;
+            saveDB(true);
+            render();
+        }
+
+        function openManageCategoriesModal() {
+            var list = document.getElementById('categoriesList');
+            list.innerHTML = categories.map(c => {
+                var delCatBtn = isAdmin() ? `<button onclick="deleteCategory('${c}')" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>` : '';
+                return `<div class="flex justify-between items-center p-2 bg-white dark:bg-slate-800 border rounded text-xs"><span class="font-bold">${c}</span>${delCatBtn}</div>`;
+            }).join('');
+            document.getElementById('categoriesModal').classList.remove('hidden');
+            document.getElementById('categoriesModal').classList.add('flex');
+        }
+        function closeManageCategoriesModal() { document.getElementById('categoriesModal').classList.remove('flex'); document.getElementById('categoriesModal').classList.add('hidden'); }
+        
+        function addNewCategory(e) {
+            e.preventDefault();
+            var val = document.getElementById('newCategoryInput').value.trim().toUpperCase();
+            if (val && !categories.includes(val)) { 
+                categories.push(val); 
+                document.getElementById('newCategoryInput').value = ''; 
+                saveDB(true); 
+                openManageCategoriesModal(); 
+            }
+        }
+
+        function deleteCategory(c) {
+            if (!isAdmin()) { alert('Apenas administradores podem excluir categorias.'); return; }
+            if (confirm(`Remover categoria "${c}"?`)) {
+                categories = categories.filter(x => x !== c);
+                saveDB(true);
+                openManageCategoriesModal();
+            }
+        }
+
+        async function openUsersModal() {
+            if (!isAdmin()) { alert('Acesso restrito ao administrador.'); return; }
+            resetUserForm();
+            document.getElementById('usersModal').classList.remove('hidden');
+            document.getElementById('usersModal').classList.add('flex');
+            carregarUsuarios();
+        }
+
+        function closeUsersModal() {
+            document.getElementById('usersModal').classList.remove('flex');
+            document.getElementById('usersModal').classList.add('hidden');
+        }
+
+        function resetUserForm() {
+            document.getElementById('editUserKey').value = '';
+            document.getElementById('u-input-login').value = '';
+            document.getElementById('u-input-login').disabled = false;
+            document.getElementById('u-input-nome').value = '';
+            document.getElementById('u-input-nivel').value = 'editor';
+            document.getElementById('u-input-senha').value = '';
+        }
+
+        async function carregarUsuarios() {
+            if (!scriptUrl) return;
+            try {
+                var res = await fetch(scriptUrl + '?action=getUsers');
+                var data = await res.json();
+                if (data && Array.isArray(data.usuarios)) {
+                    usersCache = data.usuarios;
+                    renderUsersList();
+                }
+            } catch(e){}
+        }
+
+        function renderUsersList() {
+            var container = document.getElementById('usersList');
+            if (!usersCache.length) {
+                container.innerHTML = '<p class="text-xs text-slate-400 italic p-2">Nenhum usuário secundário encontrado.</p>';
+                return;
+            }
+            container.innerHTML = usersCache.map(u => {
+                var badge = u.nivel === 'admin' 
+                    ? '<span class="px-2 py-0.5 bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10px] rounded">👑 Admin</span>'
+                    : '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 border border-blue-300 font-bold text-[10px] rounded">✏️ Editor</span>';
+                var delBtn = u.usuario !== 'admin' ? `<button onclick="deleteUserClick('${u.usuario}')" class="p-1 text-red-500 hover:text-red-700" title="Excluir Usuário"><i class="fa-solid fa-trash"></i></button>` : '';
+
+                return `
+                    <div class="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs">
+                        <div>
+                            <div class="font-bold text-slate-800 dark:text-white">${u.nome} <span class="text-slate-400 font-normal">(@${u.usuario})</span></div>
+                            <div class="mt-0.5">${badge}</div>
+                        </div>
+                        <div class="flex space-x-1">
+                            <button onclick="editUserClick('${u.usuario}')" class="p-1 text-slate-500 hover:text-foxit-orange" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                            ${delBtn}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function editUserClick(login) {
+            var u = usersCache.find(x => x.usuario === login);
+            if (!u) return;
+            document.getElementById('editUserKey').value = u.usuario;
+            document.getElementById('u-input-login').value = u.usuario;
+            document.getElementById('u-input-login').disabled = true;
+            document.getElementById('u-input-nome').value = u.nome;
+            document.getElementById('u-input-nivel').value = u.nivel;
+            document.getElementById('u-input-senha').placeholder = 'Deixe vazio para manter';
+        }
+
+        async function saveUserSubmit(e) {
+            e.preventDefault();
+            var editKey = document.getElementById('editUserKey').value;
+            var login = document.getElementById('u-input-login').value.trim().toLowerCase();
+            var nome = document.getElementById('u-input-nome').value.trim();
+            var nivel = document.getElementById('u-input-nivel').value;
+            var senha = document.getElementById('u-input-senha').value.trim();
+
+            if (!login || !nome) { alert('Preencha login e nome.'); return; }
+            if (!editKey && !senha) { alert('Informe uma senha para o novo usuário.'); return; }
+
+            var action = editKey ? 'updateUser' : 'addUser';
+            var payload = { action: action, user: { usuario: login, nome: nome, nivel: nivel, senha: senha, ativo: 'sim' } };
+
+            var res = await enviar(payload);
+            if (res && res.status === 'ok') {
+                alert('✅ Usuário salvo no Google Drive!');
+                resetUserForm();
+                carregarUsuarios();
+            } else {
+                alert('❌ ' + (res && res.message ? res.message : 'Erro ao salvar usuário.'));
+            }
+        }
+
+        async function deleteUserClick(login) {
+            if (!confirm(`Excluir o usuário @${login}?`)) return;
+            var res = await enviar({ action: 'deleteUser', usuario: login });
+            if (res && res.status === 'ok') {
+                alert('🗑️ Usuário removido!');
+                carregarUsuarios();
+            }
+        }
+
+        function openChecklistModal() {
+            document.getElementById('checklistPersonBadge').innerText = currentPerson;
+            renderChecklistContent();
+            document.getElementById('checklistModal').classList.remove('hidden');
+            document.getElementById('checklistModal').classList.add('flex');
+        }
+
+        function renderChecklistContent() {
+            var container = document.getElementById('checklistCategoriesContainer');
+            var items = db[currentPerson] || [];
+            
+            atualizarChecklistProgresso();
+
+            container.innerHTML = categories.map(cat => {
+                var catItems = items.filter(i => i.categoria === cat);
+                if (!catItems.length) return '';
+                var catOk = catItems.filter(i => i.situacao === 'OK').length;
+
+                return `
+                    <div class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+                        <div class="bg-[#f0f4f8] dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+                            <span class="font-extrabold text-xs sm:text-sm uppercase text-slate-800 dark:text-slate-100 flex items-center">
+                                <i class="fa-solid fa-folder text-foxit-orange mr-2 text-base"></i> ${cat}
+                            </span>
+                            <span class="px-2.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md font-bold text-xs text-slate-700 dark:text-slate-300">
+                                ${catOk}/${catItems.length}
+                            </span>
+                        </div>
+                        <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                            ${catItems.map(i => {
+                                var isOk = i.situacao === 'OK';
+                                return `
+                                    <div class="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                                        <label id="lbl_${i.id}" class="flex items-center space-x-3 cursor-pointer select-none flex-1">
+                                            <input type="checkbox" ${isOk ? 'checked' : ''} onchange="toggleChecklistItem('${i.id}', document.getElementById('lbl_${i.id}'))" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600">
+                                            <span class="item-title font-bold text-xs sm:text-sm ${isOk ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}">
+                                                ${i.produto}
+                                            </span>
+                                        </label>
+                                        <span class="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                            Qtd: ${i.quantidade || 1}
+                                        </span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function closeChecklistModal() {
+            document.getElementById('checklistModal').classList.remove('flex');
+            document.getElementById('checklistModal').classList.add('hidden');
+            render();
+        }
+
+        function openSettingsModal() {
+            document.getElementById('cfg-url').value = scriptUrl;
+            // Puxa e injeta a versão automaticamente no modal
+            document.getElementById('appVersionDisplay').innerText = 'v' + obterVersaoApp();
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.getElementById('settingsModal').classList.add('flex');
+        }
+        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('flex'); document.getElementById('settingsModal').classList.add('hidden'); }
+
+        async function salvarUrl() {
+            var url = document.getElementById('cfg-url').value.trim();
+            if (!url.startsWith('https://script.google.com')) { alert('URL inválida'); return; }
+            scriptUrl = url;
+            salvarLocal();
+            document.getElementById('cfg-txt').innerText = 'Status: Salvo!';
+            sincronizar();
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+
+        function toggleMobileSidebar() {
+            document.getElementById('appSidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebarBackdrop').classList.toggle('hidden');
+        }
+
+        function exportToPDF() {
+            var element = document.createElement('div');
+            element.innerHTML = `<h1 style="font-size:18px;color:#f96302;">Mochila de Emergência - ${currentPerson}</h1><p>Total de itens: ${(db[currentPerson]||[]).length}</p>`;
+            html2pdf().from(element).save(`Mochila_${currentPerson}.pdf`);
+        }
+    </script>
+</body>
+</html>

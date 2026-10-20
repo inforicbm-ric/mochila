@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Mude apenas aqui a versão para atualizar o app inteiro e o Service Worker -->
-    <meta name="app-version" content="1.0.2">
+    <meta name="app-version" content="1.0.3">
     <title>Mochila de Emergência Inteligente</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -362,7 +362,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIGURAÇÕES COM VERSÃO AUTOMÁTICA -->
+    <!-- MODAL DE CONFIGURAÇÕES -->
     <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
         <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-md w-full p-5 shadow-xl">
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-foxit-border dark:border-slate-700">
@@ -423,23 +423,17 @@
         </div>
     </div>
 
-    <!-- SCRIPT DO APLICATIVO + REGISTRO DO SERVICE WORKER -->
+    <!-- SCRIPT CORRIGIDO COM PROTEÇÃO CONTRA CONFLITO DE SINCRONIZAÇÃO -->
     <script>
-        // Registro do Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js')
                     .then(reg => {
-                        console.log('Service Worker registrado!', reg);
-                        // Verifica atualizações automaticamente quando o app ganha conexão/foco
                         reg.onupdatefound = () => {
                             const installingWorker = reg.installing;
                             installingWorker.onstatechange = () => {
-                                if (installingWorker.state === 'installed') {
-                                    if (navigator.serviceWorker.controller) {
-                                        console.log('Nova versão disponível! Atualizando...');
-                                        window.location.reload();
-                                    }
+                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    window.location.reload();
                                 }
                             };
                         };
@@ -463,7 +457,6 @@
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
 
-        // Puxa a versão automaticamente do <meta name="app-version">
         function obterVersaoApp() {
             var metaTag = document.querySelector('meta[name="app-version"]');
             return metaTag ? metaTag.getAttribute('content') : '1.0.0';
@@ -591,10 +584,11 @@
 
         function iniciarAutoSync() {
             clearInterval(autoSyncTimer);
+            // Aumentado para 10 segundos para dar tempo do usuário interagir sem conflitos
             autoSyncTimer = setInterval(function() {
-                if (!scriptUrl || !navigator.onLine || isSaving || (Date.now() - lastUserActionTime < 5000)) return;
+                if (!scriptUrl || !navigator.onLine || isSaving || (Date.now() - lastUserActionTime < 10000)) return;
                 sincronizarSilencioso();
-            }, 2000);
+            }, 10000);
         }
 
         async function sincronizarSilencioso() {
@@ -602,7 +596,8 @@
                 var res = await fetch(scriptUrl + '?action=getAll', { signal: AbortSignal.timeout(5000) });
                 var data = await res.json();
                 if (data && data.status === 'ok' && data.db) {
-                    if (Date.now() - lastUserActionTime > 5000) {
+                    // Só atualiza da nuvem se o usuário estiver há mais de 10 segundos sem clicar em nada
+                    if (Date.now() - lastUserActionTime > 10000) {
                         db = data.db;
                         limparNomesInvalidos();
                         if (Array.isArray(data.categories) && data.categories.length) {
@@ -641,7 +636,7 @@
         }
 
         function saveDB(immediate) {
-            lastUserActionTime = Date.now();
+            lastUserActionTime = Date.now(); // Marca o momento exato da ação do usuário
             salvarLocal();
             clearTimeout(saveDebounceTimer);
             
@@ -650,7 +645,7 @@
             } else {
                 saveDebounceTimer = setTimeout(function() {
                     enviar({ action: 'saveAll', db: db, categories: categories });
-                }, 1500);
+                }, 1000);
             }
         }
 
@@ -763,7 +758,7 @@
         function formatarIsoParaBr(isoStr) {
             if (!isoStr) return '';
             var p = isoStr.split('-');
-            if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+            if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
             return isoStr;
         }
 
@@ -927,7 +922,7 @@
                 document.getElementById('metricPend').innerText = total - okCount;
                 
                 renderSidebar();
-                saveDB(false);
+                saveDB(true); // Força gravação imediata na nuvem para garantir persistência sem atrasos
             }
         }
 
@@ -953,7 +948,7 @@
                 }
 
                 atualizarChecklistProgresso();
-                saveDB(false);
+                saveDB(true);
             }
         }
 
@@ -1257,7 +1252,6 @@
 
         function openSettingsModal() {
             document.getElementById('cfg-url').value = scriptUrl;
-            // Puxa e injeta a versão automaticamente no modal
             document.getElementById('appVersionDisplay').innerText = 'v' + obterVersaoApp();
             document.getElementById('settingsModal').classList.remove('hidden');
             document.getElementById('settingsModal').classList.add('flex');

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Mude apenas aqui a versão para atualizar o app inteiro e o Service Worker -->
-    <meta name="app-version" content="1.0.3">
+    <!-- Versão atualizada para forçar o PWA a atualizar no celular -->
+    <meta name="app-version" content="1.0.4">
     <title>Mochila de Emergência Inteligente</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -423,7 +423,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT CORRIGIDO COM PROTEÇÃO CONTRA CONFLITO DE SINCRONIZAÇÃO -->
+    <!-- SCRIPT CORRIGIDO COM RENDERIZAÇÃO IMEDIATA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -494,6 +494,9 @@
             if (scriptUrl) {
                 document.getElementById("cfg-url").value = scriptUrl;
             }
+            // CARREGA OS DADOS LOCAIS IMEDIATAMENTE NA TELA AO ABRIR
+            render(); 
+
             if (sessao) {
                 iniciarApp();
             }
@@ -584,7 +587,6 @@
 
         function iniciarAutoSync() {
             clearInterval(autoSyncTimer);
-            // Aumentado para 10 segundos para dar tempo do usuário interagir sem conflitos
             autoSyncTimer = setInterval(function() {
                 if (!scriptUrl || !navigator.onLine || isSaving || (Date.now() - lastUserActionTime < 10000)) return;
                 sincronizarSilencioso();
@@ -596,7 +598,6 @@
                 var res = await fetch(scriptUrl + '?action=getAll', { signal: AbortSignal.timeout(5000) });
                 var data = await res.json();
                 if (data && data.status === 'ok' && data.db) {
-                    // Só atualiza da nuvem se o usuário estiver há mais de 10 segundos sem clicar em nada
                     if (Date.now() - lastUserActionTime > 10000) {
                         db = data.db;
                         limparNomesInvalidos();
@@ -636,7 +637,7 @@
         }
 
         function saveDB(immediate) {
-            lastUserActionTime = Date.now(); // Marca o momento exato da ação do usuário
+            lastUserActionTime = Date.now();
             salvarLocal();
             clearTimeout(saveDebounceTimer);
             
@@ -758,7 +759,7 @@
         function formatarIsoParaBr(isoStr) {
             if (!isoStr) return '';
             var p = isoStr.split('-');
-            if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
+            if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
             return isoStr;
         }
 
@@ -769,520 +770,4 @@
                 var brVal = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
                 input.value = brVal;
                 if (v.length === 8) {
-                    var isoVal = v.slice(4, 8) + '-' + v.slice(2, 4) + '-' + v.slice(0, 2);
-                    document.getElementById('inputValidadeCalendar').value = isoVal;
-                }
-            } else if (v.length >= 3) {
-                input.value = v.slice(0, 2) + '/' + v.slice(2);
-            } else {
-                input.value = v;
-            }
-        }
-
-        function renderPersonView() {
-            document.getElementById('currentPersonName').innerText = currentPerson || "MOCHILA";
-            var items = db[currentPerson] || [];
-            var total = items.length;
-            var okCount = items.filter(i => i.situacao === 'OK').length;
-            var pendCount = total - okCount;
-            var expiredCount = 0;
-
-            items.forEach(i => {
-                var isoVal = converterDataParaIso(i.validade);
-                if (isoVal) {
-                    var today = new Date(); today.setHours(0,0,0,0);
-                    var expDate = new Date(isoVal + 'T00:00:00');
-                    if (Math.ceil((expDate - today) / (1000 * 60 * 60 * 24)) < 0) expiredCount++;
-                }
-            });
-
-            document.getElementById('metricTotal').innerText = total;
-            document.getElementById('metricOk').innerText = okCount;
-            document.getElementById('metricPend').innerText = pendCount;
-            document.getElementById('metricExpired').innerText = expiredCount;
-
-            var searchVal = document.getElementById('searchInput').value.toLowerCase();
-            var catVal = document.getElementById('categoryFilter').value;
-
-            var filtered = items.filter(item => {
-                var matchSearch = item.produto.toLowerCase().includes(searchVal);
-                var matchCat = catVal === 'TODAS' || item.categoria === catVal;
-                
-                var matchStatus = true;
-                var isoVal = converterDataParaIso(item.validade);
-                var isVencido = false;
-                if (isoVal) {
-                    var today = new Date(); today.setHours(0,0,0,0);
-                    var expDate = new Date(isoVal + 'T00:00:00');
-                    if (Math.ceil((expDate - today) / (1000 * 60 * 60 * 24)) < 0) isVencido = true;
-                }
-
-                if (statusFilter === 'OK') matchStatus = item.situacao === 'OK';
-                else if (statusFilter === 'PENDENTE') matchStatus = item.situacao === 'PENDENTE';
-                else if (statusFilter === 'VENCIDO') matchStatus = isVencido;
-
-                return matchSearch && matchCat && matchStatus;
-            });
-
-            var tbody = document.getElementById('itemsTableBody');
-            tbody.innerHTML = '';
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-xs font-medium text-slate-400">Nenhum item encontrado.</td></tr>`;
-                return;
-            }
-
-            filtered.forEach((item, idx) => {
-                var isOk = item.situacao === 'OK';
-                var qtd = item.quantidade || 1;
-                
-                var isoVal = converterDataParaIso(item.validade);
-                var badgeHtml = `<span class="text-slate-400 italic">Sem data</span>`;
-                
-                if (isoVal) {
-                    var today = new Date(); today.setHours(0,0,0,0);
-                    var expDate = new Date(isoVal + 'T00:00:00');
-                    var diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-                    var valBr = converterDataParaBr(isoVal);
-
-                    if (diffDays < 0) {
-                        var diasAtraso = Math.abs(diffDays);
-                        badgeHtml = `<span class="px-2 py-1 bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold">📅 ${valBr} (VENCIDO HÁ ${diasAtraso} ${diasAtraso === 1 ? 'DIA' : 'DIAS'})</span>`;
-                    } else if (diffDays === 0) {
-                        badgeHtml = `<span class="px-2 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-bold">📅 VENCE HOJE (${valBr})</span>`;
-                    } else {
-                        badgeHtml = `<span class="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[11px]">📅 ${valBr}</span>`;
-                    }
-                }
-
-                var deleteBtnHtml = isAdmin() ? `<button onclick="deleteItem('${item.id}')" class="p-1 text-slate-500 hover:text-red-600" title="Excluir"><i class="fa-solid fa-trash"></i></button>` : '';
-                var rowBg = idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-[#f7f7f7] dark:bg-[#282828]';
-                
-                var tr = document.createElement('tr');
-                tr.className = `${rowBg} border-b border-slate-200 dark:border-slate-700 text-xs`;
-                tr.innerHTML = `
-                    <td class="px-3.5 py-4 border-r border-slate-200 dark:border-slate-700">
-                        <button id="btn_status_${item.id}" onclick="toggleItemStatus('${item.id}')" class="px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
-                            ${isOk ? 'OK' : 'PENDENTE'}
-                        </button>
-                    </td>
-                    <td class="px-3.5 py-4 font-semibold text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-700">${item.categoria}</td>
-                    <td class="px-3.5 py-4 font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700">${item.produto}</td>
-                    <td class="px-3.5 py-4 text-center font-bold border-r border-slate-200 dark:border-slate-700"><span class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700">${qtd}</span></td>
-                    <td class="px-3.5 py-4 border-r border-slate-200 dark:border-slate-700">${badgeHtml}</td>
-                    <td class="px-3.5 py-4 text-right space-x-1">
-                        <button onclick="openEditItemModal('${item.id}')" class="p-1 text-slate-500 hover:text-foxit-orange" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-                        ${deleteBtnHtml}
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function setStatusFilter(status) {
-            statusFilter = status;
-            ['All', 'Ok', 'Pend', 'Venc'].forEach(s => {
-                var btn = document.getElementById('btnFilter' + s);
-                if (btn) {
-                    btn.className = 'px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition';
-                }
-            });
-            var activeId = 'btnFilterAll';
-            if (status === 'OK') activeId = 'btnFilterOk';
-            if (status === 'PENDENTE') activeId = 'btnFilterPend';
-            if (status === 'VENCIDO') activeId = 'btnFilterVenc';
-            
-            var activeBtn = document.getElementById(activeId);
-            if (activeBtn) {
-                activeBtn.className = 'px-2.5 py-1 text-xs font-bold rounded bg-slate-700 text-white transition';
-            }
-            renderPersonView();
-        }
-
-        function filterItems() { renderPersonView(); }
-        function resetAllFilters() { document.getElementById('searchInput').value = ''; document.getElementById('categoryFilter').value = 'TODAS'; setStatusFilter('TODAS'); }
-
-        function toggleItemStatus(id) {
-            lastUserActionTime = Date.now();
-            var items = db[currentPerson] || [];
-            var item = items.find(i => i.id === id);
-            if (item) {
-                item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
-                var isOk = item.situacao === 'OK';
-                
-                var btn = document.getElementById('btn_status_' + id);
-                if (btn) {
-                    btn.className = `px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`;
-                    btn.innerText = isOk ? 'OK' : 'PENDENTE';
-                }
-
-                var total = items.length;
-                var okCount = items.filter(i => i.situacao === 'OK').length;
-                document.getElementById('metricOk').innerText = okCount;
-                document.getElementById('metricPend').innerText = total - okCount;
-                
-                renderSidebar();
-                saveDB(true); // Força gravação imediata na nuvem para garantir persistência sem atrasos
-            }
-        }
-
-        function toggleChecklistItem(id, labelEl) {
-            lastUserActionTime = Date.now();
-            var items = db[currentPerson] || [];
-            var item = items.find(i => i.id === id);
-            if (item) {
-                item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
-                var isOk = item.situacao === 'OK';
-
-                if (labelEl) {
-                    var spanText = labelEl.querySelector('.item-title');
-                    if (spanText) {
-                        if (isOk) {
-                            spanText.classList.add('line-through', 'text-slate-400', 'dark:text-slate-500');
-                            spanText.classList.remove('text-slate-700', 'dark:text-slate-200');
-                        } else {
-                            spanText.classList.remove('line-through', 'text-slate-400', 'dark:text-slate-500');
-                            spanText.classList.add('text-slate-700', 'dark:text-slate-200');
-                        }
-                    }
-                }
-
-                atualizarChecklistProgresso();
-                saveDB(true);
-            }
-        }
-
-        function atualizarChecklistProgresso() {
-            var items = db[currentPerson] || [];
-            var totalItems = items.length;
-            var okItems = items.filter(i => i.situacao === 'OK').length;
-            var pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
-
-            document.getElementById('checklistPctText').innerText = pct + '%';
-            document.getElementById('checklistProgressBar').style.width = pct + '%';
-            document.getElementById('checklistCountText').innerText = `${okItems}/${totalItems} itens verificados`;
-        }
-
-        function openAddItemModal() {
-            document.getElementById('modalTitle').innerText = 'Adicionar Item';
-            document.getElementById('editItemId').value = '';
-            document.getElementById('inputProduto').value = '';
-            document.getElementById('inputQuantidade').value = '1';
-            document.getElementById('inputValidadeCalendar').value = '';
-            document.getElementById('inputValidadeText').value = '';
-            document.getElementById('itemModal').classList.remove('hidden');
-            document.getElementById('itemModal').classList.add('flex');
-        }
-
-        function openEditItemModal(id) {
-            var item = (db[currentPerson] || []).find(i => i.id === id);
-            if (!item) return;
-            document.getElementById('modalTitle').innerText = 'Editar Item';
-            document.getElementById('editItemId').value = item.id;
-            document.getElementById('inputProduto').value = item.produto;
-            document.getElementById('inputQuantidade').value = item.quantidade || 1;
-            document.getElementById('inputCategoria').value = item.categoria;
-            document.getElementById('inputSituacao').value = item.situacao;
-            
-            var isoVal = converterDataParaIso(item.validade);
-            document.getElementById('inputValidadeCalendar').value = isoVal || '';
-            document.getElementById('inputValidadeText').value = converterDataParaBr(isoVal || '');
-
-            document.getElementById('itemModal').classList.remove('hidden');
-            document.getElementById('itemModal').classList.add('flex');
-        }
-
-        function closeItemModal() { document.getElementById('itemModal').classList.remove('flex'); document.getElementById('itemModal').classList.add('hidden'); }
-
-        function saveItem(e) {
-            e.preventDefault();
-            var id = document.getElementById('editItemId').value;
-            var produto = document.getElementById('inputProduto').value;
-            var quantidade = parseInt(document.getElementById('inputQuantidade').value) || 1;
-            var categoria = document.getElementById('inputCategoria').value;
-            var situacao = document.getElementById('inputSituacao').value;
-            
-            var textVal = document.getElementById('inputValidadeText').value.trim();
-            var validade = converterDataParaIso(textVal);
-
-            if (!db[currentPerson]) db[currentPerson] = [];
-
-            if (id) {
-                var item = db[currentPerson].find(i => i.id === id);
-                if (item) { item.produto = produto; item.quantidade = quantidade; item.categoria = categoria; item.situacao = situacao; item.validade = validade; }
-            } else {
-                db[currentPerson].push({ id: currentPerson.toLowerCase() + '_' + Date.now(), produto, quantidade, categoria, situacao, validade });
-            }
-            closeItemModal();
-            saveDB(true);
-            render();
-        }
-
-        function deleteItem(id) {
-            if (!isAdmin()) { alert('Apenas administradores podem excluir itens.'); return; }
-            if (confirm("Remover este item?")) {
-                db[currentPerson] = (db[currentPerson] || []).filter(i => i.id !== id);
-                saveDB(true);
-                render();
-            }
-        }
-
-        function openAddPersonModal() {
-            var name = prompt("Nome da nova pessoa / dono da mochila:").trim().toUpperCase();
-            if (!name) return;
-            if (db[name]) { alert("Já existe."); return; }
-            db[name] = [];
-            currentPerson = name;
-            saveDB(true);
-            render();
-        }
-
-        function deleteCurrentPerson() {
-            if (!isAdmin()) { alert('Apenas administradores podem excluir mochilas.'); return; }
-            if (Object.keys(db).length <= 1) { alert("Mantenha pelo menos uma mochila."); return; }
-            if (confirm("Excluir esta mochila?")) {
-                delete db[currentPerson];
-                currentPerson = Object.keys(db)[0];
-                saveDB(true);
-                render();
-            }
-        }
-
-        function duplicateCurrentPersonList() {
-            var newName = prompt("Nome da nova mochila duplicada:").trim().toUpperCase();
-            if (!newName || db[newName]) return;
-            db[newName] = JSON.parse(JSON.stringify(db[currentPerson] || []));
-            currentPerson = newName;
-            saveDB(true);
-            render();
-        }
-
-        function openManageCategoriesModal() {
-            var list = document.getElementById('categoriesList');
-            list.innerHTML = categories.map(c => {
-                var delCatBtn = isAdmin() ? `<button onclick="deleteCategory('${c}')" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>` : '';
-                return `<div class="flex justify-between items-center p-2 bg-white dark:bg-slate-800 border rounded text-xs"><span class="font-bold">${c}</span>${delCatBtn}</div>`;
-            }).join('');
-            document.getElementById('categoriesModal').classList.remove('hidden');
-            document.getElementById('categoriesModal').classList.add('flex');
-        }
-        function closeManageCategoriesModal() { document.getElementById('categoriesModal').classList.remove('flex'); document.getElementById('categoriesModal').classList.add('hidden'); }
-        
-        function addNewCategory(e) {
-            e.preventDefault();
-            var val = document.getElementById('newCategoryInput').value.trim().toUpperCase();
-            if (val && !categories.includes(val)) { 
-                categories.push(val); 
-                document.getElementById('newCategoryInput').value = ''; 
-                saveDB(true); 
-                openManageCategoriesModal(); 
-            }
-        }
-
-        function deleteCategory(c) {
-            if (!isAdmin()) { alert('Apenas administradores podem excluir categorias.'); return; }
-            if (confirm(`Remover categoria "${c}"?`)) {
-                categories = categories.filter(x => x !== c);
-                saveDB(true);
-                openManageCategoriesModal();
-            }
-        }
-
-        async function openUsersModal() {
-            if (!isAdmin()) { alert('Acesso restrito ao administrador.'); return; }
-            resetUserForm();
-            document.getElementById('usersModal').classList.remove('hidden');
-            document.getElementById('usersModal').classList.add('flex');
-            carregarUsuarios();
-        }
-
-        function closeUsersModal() {
-            document.getElementById('usersModal').classList.remove('flex');
-            document.getElementById('usersModal').classList.add('hidden');
-        }
-
-        function resetUserForm() {
-            document.getElementById('editUserKey').value = '';
-            document.getElementById('u-input-login').value = '';
-            document.getElementById('u-input-login').disabled = false;
-            document.getElementById('u-input-nome').value = '';
-            document.getElementById('u-input-nivel').value = 'editor';
-            document.getElementById('u-input-senha').value = '';
-        }
-
-        async function carregarUsuarios() {
-            if (!scriptUrl) return;
-            try {
-                var res = await fetch(scriptUrl + '?action=getUsers');
-                var data = await res.json();
-                if (data && Array.isArray(data.usuarios)) {
-                    usersCache = data.usuarios;
-                    renderUsersList();
-                }
-            } catch(e){}
-        }
-
-        function renderUsersList() {
-            var container = document.getElementById('usersList');
-            if (!usersCache.length) {
-                container.innerHTML = '<p class="text-xs text-slate-400 italic p-2">Nenhum usuário secundário encontrado.</p>';
-                return;
-            }
-            container.innerHTML = usersCache.map(u => {
-                var badge = u.nivel === 'admin' 
-                    ? '<span class="px-2 py-0.5 bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10px] rounded">👑 Admin</span>'
-                    : '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 border border-blue-300 font-bold text-[10px] rounded">✏️ Editor</span>';
-                var delBtn = u.usuario !== 'admin' ? `<button onclick="deleteUserClick('${u.usuario}')" class="p-1 text-red-500 hover:text-red-700" title="Excluir Usuário"><i class="fa-solid fa-trash"></i></button>` : '';
-
-                return `
-                    <div class="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs">
-                        <div>
-                            <div class="font-bold text-slate-800 dark:text-white">${u.nome} <span class="text-slate-400 font-normal">(@${u.usuario})</span></div>
-                            <div class="mt-0.5">${badge}</div>
-                        </div>
-                        <div class="flex space-x-1">
-                            <button onclick="editUserClick('${u.usuario}')" class="p-1 text-slate-500 hover:text-foxit-orange" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-                            ${delBtn}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function editUserClick(login) {
-            var u = usersCache.find(x => x.usuario === login);
-            if (!u) return;
-            document.getElementById('editUserKey').value = u.usuario;
-            document.getElementById('u-input-login').value = u.usuario;
-            document.getElementById('u-input-login').disabled = true;
-            document.getElementById('u-input-nome').value = u.nome;
-            document.getElementById('u-input-nivel').value = u.nivel;
-            document.getElementById('u-input-senha').placeholder = 'Deixe vazio para manter';
-        }
-
-        async function saveUserSubmit(e) {
-            e.preventDefault();
-            var editKey = document.getElementById('editUserKey').value;
-            var login = document.getElementById('u-input-login').value.trim().toLowerCase();
-            var nome = document.getElementById('u-input-nome').value.trim();
-            var nivel = document.getElementById('u-input-nivel').value;
-            var senha = document.getElementById('u-input-senha').value.trim();
-
-            if (!login || !nome) { alert('Preencha login e nome.'); return; }
-            if (!editKey && !senha) { alert('Informe uma senha para o novo usuário.'); return; }
-
-            var action = editKey ? 'updateUser' : 'addUser';
-            var payload = { action: action, user: { usuario: login, nome: nome, nivel: nivel, senha: senha, ativo: 'sim' } };
-
-            var res = await enviar(payload);
-            if (res && res.status === 'ok') {
-                alert('✅ Usuário salvo no Google Drive!');
-                resetUserForm();
-                carregarUsuarios();
-            } else {
-                alert('❌ ' + (res && res.message ? res.message : 'Erro ao salvar usuário.'));
-            }
-        }
-
-        async function deleteUserClick(login) {
-            if (!confirm(`Excluir o usuário @${login}?`)) return;
-            var res = await enviar({ action: 'deleteUser', usuario: login });
-            if (res && res.status === 'ok') {
-                alert('🗑️ Usuário removido!');
-                carregarUsuarios();
-            }
-        }
-
-        function openChecklistModal() {
-            document.getElementById('checklistPersonBadge').innerText = currentPerson;
-            renderChecklistContent();
-            document.getElementById('checklistModal').classList.remove('hidden');
-            document.getElementById('checklistModal').classList.add('flex');
-        }
-
-        function renderChecklistContent() {
-            var container = document.getElementById('checklistCategoriesContainer');
-            var items = db[currentPerson] || [];
-            
-            atualizarChecklistProgresso();
-
-            container.innerHTML = categories.map(cat => {
-                var catItems = items.filter(i => i.categoria === cat);
-                if (!catItems.length) return '';
-                var catOk = catItems.filter(i => i.situacao === 'OK').length;
-
-                return `
-                    <div class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-                        <div class="bg-[#f0f4f8] dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                            <span class="font-extrabold text-xs sm:text-sm uppercase text-slate-800 dark:text-slate-100 flex items-center">
-                                <i class="fa-solid fa-folder text-foxit-orange mr-2 text-base"></i> ${cat}
-                            </span>
-                            <span class="px-2.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md font-bold text-xs text-slate-700 dark:text-slate-300">
-                                ${catOk}/${catItems.length}
-                            </span>
-                        </div>
-                        <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
-                            ${catItems.map(i => {
-                                var isOk = i.situacao === 'OK';
-                                return `
-                                    <div class="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                                        <label id="lbl_${i.id}" class="flex items-center space-x-3 cursor-pointer select-none flex-1">
-                                            <input type="checkbox" ${isOk ? 'checked' : ''} onchange="toggleChecklistItem('${i.id}', document.getElementById('lbl_${i.id}'))" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600">
-                                            <span class="item-title font-bold text-xs sm:text-sm ${isOk ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}">
-                                                ${i.produto}
-                                            </span>
-                                        </label>
-                                        <span class="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                            Qtd: ${i.quantidade || 1}
-                                        </span>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function closeChecklistModal() {
-            document.getElementById('checklistModal').classList.remove('flex');
-            document.getElementById('checklistModal').classList.add('hidden');
-            render();
-        }
-
-        function openSettingsModal() {
-            document.getElementById('cfg-url').value = scriptUrl;
-            document.getElementById('appVersionDisplay').innerText = 'v' + obterVersaoApp();
-            document.getElementById('settingsModal').classList.remove('hidden');
-            document.getElementById('settingsModal').classList.add('flex');
-        }
-        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('flex'); document.getElementById('settingsModal').classList.add('hidden'); }
-
-        async function salvarUrl() {
-            var url = document.getElementById('cfg-url').value.trim();
-            if (!url.startsWith('https://script.google.com')) { alert('URL inválida'); return; }
-            scriptUrl = url;
-            salvarLocal();
-            document.getElementById('cfg-txt').innerText = 'Status: Salvo!';
-            sincronizar();
-        }
-
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-        }
-        if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
-
-        function toggleMobileSidebar() {
-            document.getElementById('appSidebar').classList.toggle('-translate-x-full');
-            document.getElementById('sidebarBackdrop').classList.toggle('hidden');
-        }
-
-        function exportToPDF() {
-            var element = document.createElement('div');
-            element.innerHTML = `<h1 style="font-size:18px;color:#f96302;">Mochila de Emergência - ${currentPerson}</h1><p>Total de itens: ${(db[currentPerson]||[]).length}</p>`;
-            html2pdf().from(element).save(`Mochila_${currentPerson}.pdf`);
-        }
-    </script>
-</body>
-</html>
+                    var

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="1.0.8">
-    <title>Mochila de Emergência Inteligente</title>
+    <meta name="app-version" content="2.0.0">
+    <title>Mochila de Emergência Inteligente - Online</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,7 +44,7 @@
                     <i class="fa-solid fa-briefcase"></i>
                 </span>
                 <h1 class="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">Mochila de Emergência</h1>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Faça login para acessar o sistema</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Faça login para acessar o sistema online</p>
             </div>
             
             <div id="login-err" class="hidden bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 rounded p-2.5 text-xs mb-3 font-semibold"></div>
@@ -64,7 +64,7 @@
                 <i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema
             </button>
 
-            <!-- Bloco de Configuração da URL (Sempre visível no login para evitar bloqueio) -->
+            <!-- Configuração da URL (Privada do Dispositivo) -->
             <div class="mt-4 pt-3 border-t border-foxit-border dark:border-slate-700">
                 <p class="text-[11px] text-slate-600 dark:text-slate-300 font-bold mb-1"><i class="fa-solid fa-link mr-1 text-foxit-orange"></i> URL do Web App (Google Sheets):</p>
                 <div class="flex gap-1.5">
@@ -83,11 +83,11 @@
                     <span class="w-5 h-5 bg-foxit-orange text-white rounded flex items-center justify-center font-bold text-xs shadow-sm">
                         <i class="fa-solid fa-file-pdf"></i>
                     </span>
-                    <span class="font-semibold text-slate-700 dark:text-slate-300">Mochila de Emergência Inteligente</span>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">Mochila de Emergência (Online)</span>
                     <span id="user-chip" class="text-[11px] bg-foxit-orange/20 text-foxit-orange font-bold px-2 py-0.5 rounded">👤 Usuário</span>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button onclick="sincronizar()" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Sincronizar agora">
+                    <button onclick="carregarDadosOnline(true)" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Sincronizar agora">
                         <i id="syncIcon" class="fa-solid fa-rotate"></i>
                     </button>
                     <button onclick="toggleDarkMode()" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Alternar Modo Escuro">
@@ -243,7 +243,7 @@
                     </div>
 
                     <div class="p-2.5 bg-[#f0f0f0] dark:bg-[#252525] border-t border-foxit-border dark:border-foxit-darkBorder flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                        <span>Sincronizado com Google Drive / Sheets</span>
+                        <span>Conectado em tempo real ao Google Sheets</span>
                     </div>
                 </div>
             </main>
@@ -369,13 +369,12 @@
                     <input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/..." class="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white">
                 </div>
                 <div class="flex items-center justify-between">
-                    <span id="cfg-txt" class="font-semibold text-slate-600 dark:text-slate-400">Status: Verificando...</span>
-                    <button onclick="salvarUrl()" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold rounded shadow-sm">Salvar e Testar</button>
+                    <span id="cfg-txt" class="font-semibold text-slate-600 dark:text-slate-400">Status: Conectado</span>
+                    <button onclick="salvarUrlConfigModal()" class="px-3 py-1.5 bg-foxit-orange hover:bg-foxit-hover text-white font-bold rounded shadow-sm">Salvar URL</button>
                 </div>
-                <!-- Exibição Automática da Versão -->
                 <div class="pt-3 border-t border-foxit-border dark:border-slate-700 flex items-center justify-between text-slate-500 dark:text-slate-400">
                     <span>Versão Atual do Aplicativo:</span>
-                    <span id="appVersionDisplay" class="font-bold text-foxit-orange bg-foxit-orange/10 px-2 py-0.5 rounded">Carregando...</span>
+                    <span id="appVersionDisplay" class="font-bold text-foxit-orange bg-foxit-orange/10 px-2 py-0.5 rounded">v2.0.0</span>
                 </div>
             </div>
             <div class="flex justify-end pt-3 mt-4 border-t border-foxit-border dark:border-slate-700">
@@ -384,6 +383,7 @@
         </div>
     </div>
 
+    <!-- CHECKLIST -->
     <div id="checklistModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden flex-col z-50 overflow-y-auto p-3 sm:p-6">
         <div class="max-w-5xl w-full mx-auto my-auto bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 flex flex-col min-h-[80vh]">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
@@ -417,70 +417,41 @@
         </div>
     </div>
 
-    <!-- SCRIPT FINAL INTELIGENTE (v1.0.8) -->
+    <!-- SCRIPT 100% ONLINE (v2.0.0) -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then(reg => {
-                        reg.onupdatefound = () => {
-                            const installingWorker = reg.installing;
-                            installingWorker.onstatechange = () => {
-                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    window.location.reload();
-                                }
-                            };
-                        };
-                    })
-                    .catch(err => console.log('Erro no Service Worker:', err));
-            });
-        }
-
-        var categories = JSON.parse(localStorage.getItem('m_categories')) || ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
-        var db = JSON.parse(localStorage.getItem('emergency_backpacks_db')) || {};
-
+        var categories = ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
+        var db = {};
         var scriptUrl = localStorage.getItem('m_scriptUrl') || '';
         var sessao = JSON.parse(localStorage.getItem('m_sessao') || 'null');
         var currentPerson = "";
         var statusFilter = "TODAS";
-        var autoSyncTimer = null;
-        var saveDebounceTimer = null;
-        var lastUserActionTime = 0; 
-        var isSaving = false;
+        var onlineSyncInterval = null;
         var usersCache = [];
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
-
-        function obterVersaoApp() {
-            var metaTag = document.querySelector('meta[name="app-version"]');
-            return metaTag ? metaTag.getAttribute('content') : '1.0.0';
-        }
 
         function salvarUrlLogin() {
             var url = document.getElementById('cfg-url-login').value.trim();
             if (!url.startsWith('https://script.google.com')) { alert('❌ URL inválida'); return; }
             scriptUrl = url;
-            salvarLocal();
-            alert('✅ URL configurada com sucesso!');
+            localStorage.setItem('m_scriptUrl', scriptUrl);
+            alert('✅ URL salva com sucesso neste dispositivo!');
         }
 
-        function limparNomesInvalidos() {
-            var limpo = {};
-            for (var k in db) {
-                if (k.startsWith('{') || k.length > 50) continue;
-                limpo[k] = db[k];
-            }
-            db = limpo;
-            localStorage.setItem('emergency_backpacks_db', JSON.stringify(db));
+        function salvarUrlConfigModal() {
+            var url = document.getElementById('cfg-url').value.trim();
+            if (!url.startsWith('https://script.google.com')) { alert('❌ URL inválida'); return; }
+            scriptUrl = url;
+            localStorage.setItem('m_scriptUrl', scriptUrl);
+            document.getElementById('cfg-txt').innerText = 'Status: Salvo!';
+            carregarDadosOnline(true);
         }
 
         window.addEventListener("DOMContentLoaded", function() {
-            limparNomesInvalidos();
             if (scriptUrl) {
                 document.getElementById("cfg-url-login").value = scriptUrl;
                 document.getElementById("cfg-url").value = scriptUrl;
             }
-            
             if (sessao) {
                 iniciarApp();
             } else {
@@ -488,12 +459,6 @@
                 document.getElementById('main-app').style.display = 'none';
             }
         });
-
-        function salvarLocal() {
-            localStorage.setItem('m_categories', JSON.stringify(categories));
-            localStorage.setItem('emergency_backpacks_db', JSON.stringify(db));
-            localStorage.setItem('m_scriptUrl', scriptUrl);
-        }
 
         async function fazerLogin() {
             var usuario = document.getElementById('l-user').value.trim();
@@ -506,7 +471,7 @@
 
             if (scriptUrl) {
                 try {
-                    var res = await fetch(scriptUrl + '?action=login&usuario=' + encodeURIComponent(usuario) + '&senha=' + encodeURIComponent(senha));
+                    var res = await fetch(scriptUrl + '?action=login&usuario=' + encodeURIComponent(usuario) + '&senha=' + encodeURIComponent(senha), { cache: 'no-store' });
                     var data = await res.json();
                     if (data && data.status === 'ok') {
                         sessao = { nome: data.nome, nivel: data.nivel, token: data.token, usuario: data.usuario };
@@ -521,7 +486,7 @@
                         btn.disabled = false;
                         return;
                     }
-                } catch(e){}
+                } catch(e) {}
             }
 
             if (usuario.toLowerCase() === 'admin' && senha === 'admin') {
@@ -532,7 +497,7 @@
                 if (!scriptUrl) {
                     mostrarErroLogin('Configure a URL do Google Sheets no campo abaixo.');
                 } else {
-                    mostrarErroLogin('Erro de comunicação. Verifique a URL do Web App.');
+                    mostrarErroLogin('Erro de comunicação. Verifique a URL.');
                 }
             }
             btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema';
@@ -549,7 +514,7 @@
             if (!confirm('Deseja sair do aplicativo?')) return;
             sessao = null;
             localStorage.removeItem('m_sessao');
-            clearInterval(autoSyncTimer);
+            clearInterval(onlineSyncInterval);
             document.getElementById('main-app').style.display = 'none';
             document.getElementById('login-wrap').style.display = 'flex';
             document.getElementById('l-user').value = '';
@@ -568,84 +533,58 @@
             document.getElementById('login-wrap').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             aplicarPermissoesInterface();
-            render();
-            await sincronizar();
-            iniciarAutoSync();
+            await carregarDadosOnline(true);
+            iniciarTempoReal();
         }
 
-        function iniciarAutoSync() {
-            clearInterval(autoSyncTimer);
-            autoSyncTimer = setInterval(function() {
-                if (!scriptUrl || !navigator.onLine || isSaving) return;
-                sincronizarSilencioso();
+        function iniciarTempoReal() {
+            clearInterval(onlineSyncInterval);
+            // Sincroniza automaticamente a cada 5 segundos buscando direto do Google Sheets
+            onlineSyncInterval = setInterval(function() {
+                if (!scriptUrl || !navigator.onLine) return;
+                carregarDadosOnline(false);
             }, 5000);
         }
 
-        async function sincronizarSilencioso() {
-            try {
-                var res = await fetch(scriptUrl + '?action=getAll', { 
-                    cache: 'no-store',
-                    signal: AbortSignal.timeout(5000) 
-                });
-                var data = await res.json();
-                if (data && data.status === 'ok' && data.db) {
-                    var stringNuvem = JSON.stringify(data.db);
-                    var stringLocal = JSON.stringify(db);
-
-                    if (stringNuvem !== stringLocal && (Date.now() - lastUserActionTime > 3000)) {
-                        db = data.db;
-                        limparNomesInvalidos();
-                        if (Array.isArray(data.categories) && data.categories.length) {
-                            categories = data.categories;
-                        }
-                        salvarLocal();
-                        render();
-                    }
-                }
-            } catch(e){}
-        }
-
-        async function sincronizar() {
+        async function carregarDadosOnline(animarIcone) {
             if (!scriptUrl) return;
             var icon = document.getElementById('syncIcon');
-            if (icon) icon.classList.add('fa-spin');
-            await sincronizarSilencioso();
-            if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+            if (animarIcone && icon) icon.classList.add('fa-spin');
+
+            try {
+                var res = await fetch(scriptUrl + '?action=getAll', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+                var data = await res.json();
+                if (data && data.status === 'ok') {
+                    if (data.db) db = data.db;
+                    if (Array.isArray(data.categories) && data.categories.length) categories = data.categories;
+                    render();
+                }
+            } catch(e) {}
+
+            if (animarIcone && icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
         }
 
-        async function enviar(payload) {
+        async function enviarAcaoOnline(payload) {
             if (!scriptUrl) return null;
-            isSaving = true;
             try {
                 var res = await fetch(scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
-                isSaving = false;
                 return await res.json();
             } catch(e) {
-                isSaving = false;
+                alert('❌ Erro de comunicação com a nuvem.');
                 return null;
             }
         }
 
-        function saveDB(immediate) {
-            lastUserActionTime = Date.now();
-            salvarLocal();
-            clearTimeout(saveDebounceTimer);
-            
-            if (immediate) {
-                enviar({ action: 'saveAll', db: db, categories: categories });
-            } else {
-                saveDebounceTimer = setTimeout(function() {
-                    enviar({ action: 'saveAll', db: db, categories: categories });
-                }, 1000);
-            }
+        async function salvarAlteracoesNuvem() {
+            await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
+            render();
         }
 
         function render() {
-            limparNomesInvalidos();
             var keys = Object.keys(db);
             if (keys.length === 0) {
                 db["RICHARD RYAN"] = [];
@@ -720,10 +659,7 @@
             if (s.includes('GMT') || s.includes('Mon') || s.includes('Tue') || s.includes('Wed') || s.includes('Thu') || s.includes('Fri') || s.includes('Sat') || s.includes('Sun')) {
                 var d = new Date(s);
                 if (!isNaN(d.getTime())) {
-                    var ano = d.getFullYear();
-                    var mes = String(d.getMonth() + 1).padStart(2, '0');
-                    var dia = String(d.getDate()).padStart(2, '0');
-                    return ano + '-' + mes + '-' + dia;
+                    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                 }
                 return '';
             }
@@ -753,7 +689,7 @@
         function formatarIsoParaBr(isoStr) {
             if (!isoStr) return '';
             var p = isoStr.split('-');
-            if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+            if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
             return isoStr;
         }
 
@@ -761,11 +697,9 @@
             var v = input.value.replace(/\D/g, '');
             if (v.length > 8) v = v.slice(0, 8);
             if (v.length >= 5) {
-                var brVal = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
-                input.value = brVal;
+                input.value = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
                 if (v.length === 8) {
-                    var isoVal = v.slice(4, 8) + '-' + v.slice(2, 4) + '-' + v.slice(0, 2);
-                    document.getElementById('inputValidadeCalendar').value = isoVal;
+                    document.getElementById('inputValidadeCalendar').value = v.slice(4, 8) + '-' + v.slice(2, 4) + '-' + v.slice(0, 2);
                 }
             } else if (v.length >= 3) {
                 input.value = v.slice(0, 2) + '/' + v.slice(2);
@@ -830,7 +764,6 @@
             filtered.forEach((item, idx) => {
                 var isOk = item.situacao === 'OK';
                 var qtd = item.quantidade || 1;
-                
                 var isoVal = converterDataParaIso(item.validade);
                 var badgeHtml = `<span class="text-slate-400 italic">Sem data</span>`;
                 
@@ -841,10 +774,9 @@
                     var valBr = converterDataParaBr(isoVal);
 
                     if (diffDays < 0) {
-                        var diasAtraso = Math.abs(diffDays);
-                        badgeHtml = `<span class="px-2 py-1 bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold">📅 ${valBr} (VENCIDO HÁ ${diasAtraso} ${diasAtraso === 1 ? 'DIA' : 'DIAS'})</span>`;
+                        badgeHtml = `<span class="px-2 py-1 bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold">📅 ${valBr} (VENCIDO)</span>`;
                     } else if (diffDays === 0) {
-                        badgeHtml = `<span class="px-2 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-bold">📅 VENCE HOJE (${valBr})</span>`;
+                        badgeHtml = `<span class="px-2 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-bold">📅 VENCE HOJE</span>`;
                     } else {
                         badgeHtml = `<span class="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[11px]">📅 ${valBr}</span>`;
                     }
@@ -857,7 +789,7 @@
                 tr.className = `${rowBg} border-b border-slate-200 dark:border-slate-700 text-xs`;
                 tr.innerHTML = `
                     <td class="px-3.5 py-4 border-r border-slate-200 dark:border-slate-700">
-                        <button id="btn_status_${item.id}" onclick="toggleItemStatus('${item.id}')" class="px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
+                        <button onclick="toggleItemStatus('${item.id}')" class="px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
                             ${isOk ? 'OK' : 'PENDENTE'}
                         </button>
                     </td>
@@ -878,9 +810,7 @@
             statusFilter = status;
             ['All', 'Ok', 'Pend', 'Venc'].forEach(s => {
                 var btn = document.getElementById('btnFilter' + s);
-                if (btn) {
-                    btn.className = 'px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition';
-                }
+                if (btn) btn.className = 'px-2.5 py-1 text-xs font-medium rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-foxit-border transition';
             });
             var activeId = 'btnFilterAll';
             if (status === 'OK') activeId = 'btnFilterOk';
@@ -888,74 +818,31 @@
             if (status === 'VENCIDO') activeId = 'btnFilterVenc';
             
             var activeBtn = document.getElementById(activeId);
-            if (activeBtn) {
-                activeBtn.className = 'px-2.5 py-1 text-xs font-bold rounded bg-slate-700 text-white transition';
-            }
+            if (activeBtn) activeBtn.className = 'px-2.5 py-1 text-xs font-bold rounded bg-slate-700 text-white transition';
             renderPersonView();
         }
 
         function filterItems() { renderPersonView(); }
         function resetAllFilters() { document.getElementById('searchInput').value = ''; document.getElementById('categoryFilter').value = 'TODAS'; setStatusFilter('TODAS'); }
 
-        function toggleItemStatus(id) {
-            lastUserActionTime = Date.now();
+        async function toggleItemStatus(id) {
             var items = db[currentPerson] || [];
             var item = items.find(i => i.id === id);
             if (item) {
                 item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
-                var isOk = item.situacao === 'OK';
-                
-                var btn = document.getElementById('btn_status_' + id);
-                if (btn) {
-                    btn.className = `px-3 py-1.5 rounded text-[11px] font-bold ${isOk ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`;
-                    btn.innerText = isOk ? 'OK' : 'PENDENTE';
-                }
-
-                var total = items.length;
-                var okCount = items.filter(i => i.situacao === 'OK').length;
-                document.getElementById('metricOk').innerText = okCount;
-                document.getElementById('metricPend').innerText = total - okCount;
-                
-                renderSidebar();
-                saveDB(true);
+                render();
+                await salvarAlteracoesNuvem();
             }
         }
 
-        function toggleChecklistItem(id, labelEl) {
-            lastUserActionTime = Date.now();
+        async function toggleChecklistItem(id) {
             var items = db[currentPerson] || [];
             var item = items.find(i => i.id === id);
             if (item) {
                 item.situacao = item.situacao === 'OK' ? 'PENDENTE' : 'OK';
-                var isOk = item.situacao === 'OK';
-
-                if (labelEl) {
-                    var spanText = labelEl.querySelector('.item-title');
-                    if (spanText) {
-                        if (isOk) {
-                            spanText.classList.add('line-through', 'text-slate-400', 'dark:text-slate-500');
-                            spanText.classList.remove('text-slate-700', 'dark:text-slate-200');
-                        } else {
-                            spanText.classList.remove('line-through', 'text-slate-400', 'dark:text-slate-500');
-                            spanText.classList.add('text-slate-700', 'dark:text-slate-200');
-                        }
-                    }
-                }
-
-                atualizarChecklistProgresso();
-                saveDB(true);
+                renderChecklistContent();
+                await salvarAlteracoesNuvem();
             }
-        }
-
-        function atualizarChecklistProgresso() {
-            var items = db[currentPerson] || [];
-            var totalItems = items.length;
-            var okItems = items.filter(i => i.situacao === 'OK').length;
-            var pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
-
-            document.getElementById('checklistPctText').innerText = pct + '%';
-            document.getElementById('checklistProgressBar').style.width = pct + '%';
-            document.getElementById('checklistCountText').innerText = `${okItems}/${totalItems} itens verificados`;
         }
 
         function openAddItemModal() {
@@ -989,16 +876,14 @@
 
         function closeItemModal() { document.getElementById('itemModal').classList.remove('flex'); document.getElementById('itemModal').classList.add('hidden'); }
 
-        function saveItem(e) {
+        async function saveItem(e) {
             e.preventDefault();
             var id = document.getElementById('editItemId').value;
             var produto = document.getElementById('inputProduto').value;
             var quantidade = parseInt(document.getElementById('inputQuantidade').value) || 1;
             var categoria = document.getElementById('inputCategoria').value;
             var situacao = document.getElementById('inputSituacao').value;
-            
-            var textVal = document.getElementById('inputValidadeText').value.trim();
-            var validade = converterDataParaIso(textVal);
+            var validade = converterDataParaIso(document.getElementById('inputValidadeText').value.trim());
 
             if (!db[currentPerson]) db[currentPerson] = [];
 
@@ -1009,47 +894,47 @@
                 db[currentPerson].push({ id: currentPerson.toLowerCase() + '_' + Date.now(), produto, quantidade, categoria, situacao, validade });
             }
             closeItemModal();
-            saveDB(true);
             render();
+            await salvarAlteracoesNuvem();
         }
 
-        function deleteItem(id) {
+        async function deleteItem(id) {
             if (!isAdmin()) { alert('Apenas administradores podem excluir itens.'); return; }
             if (confirm("Remover este item?")) {
                 db[currentPerson] = (db[currentPerson] || []).filter(i => i.id !== id);
-                saveDB(true);
                 render();
+                await salvarAlteracoesNuvem();
             }
         }
 
-        function openAddPersonModal() {
+        async function openAddPersonModal() {
             var name = prompt("Nome da nova pessoa / dono da mochila:").trim().toUpperCase();
             if (!name) return;
             if (db[name]) { alert("Já existe."); return; }
             db[name] = [];
             currentPerson = name;
-            saveDB(true);
             render();
+            await salvarAlteracoesNuvem();
         }
 
-        function deleteCurrentPerson() {
+        async function deleteCurrentPerson() {
             if (!isAdmin()) { alert('Apenas administradores podem excluir mochilas.'); return; }
             if (Object.keys(db).length <= 1) { alert("Mantenha pelo menos uma mochila."); return; }
             if (confirm("Excluir esta mochila?")) {
                 delete db[currentPerson];
                 currentPerson = Object.keys(db)[0];
-                saveDB(true);
                 render();
+                await salvarAlteracoesNuvem();
             }
         }
 
-        function duplicateCurrentPersonList() {
+        async function duplicateCurrentPersonList() {
             var newName = prompt("Nome da nova mochila duplicada:").trim().toUpperCase();
             if (!newName || db[newName]) return;
             db[newName] = JSON.parse(JSON.stringify(db[currentPerson] || []));
             currentPerson = newName;
-            saveDB(true);
             render();
+            await salvarAlteracoesNuvem();
         }
 
         function openManageCategoriesModal() {
@@ -1063,23 +948,23 @@
         }
         function closeManageCategoriesModal() { document.getElementById('categoriesModal').classList.remove('flex'); document.getElementById('categoriesModal').classList.add('hidden'); }
         
-        function addNewCategory(e) {
+        async function addNewCategory(e) {
             e.preventDefault();
             var val = document.getElementById('newCategoryInput').value.trim().toUpperCase();
             if (val && !categories.includes(val)) { 
                 categories.push(val); 
                 document.getElementById('newCategoryInput').value = ''; 
-                saveDB(true); 
                 openManageCategoriesModal(); 
+                await salvarAlteracoesNuvem();
             }
         }
 
-        function deleteCategory(c) {
+        async function deleteCategory(c) {
             if (!isAdmin()) { alert('Apenas administradores podem excluir categorias.'); return; }
             if (confirm(`Remover categoria "${c}"?`)) {
                 categories = categories.filter(x => x !== c);
-                saveDB(true);
                 openManageCategoriesModal();
+                await salvarAlteracoesNuvem();
             }
         }
 
@@ -1108,13 +993,13 @@
         async function carregarUsuarios() {
             if (!scriptUrl) return;
             try {
-                var res = await fetch(scriptUrl + '?action=getUsers');
+                var res = await fetch(scriptUrl + '?action=getUsers', { cache: 'no-store' });
                 var data = await res.json();
                 if (data && Array.isArray(data.usuarios)) {
                     usersCache = data.usuarios;
                     renderUsersList();
                 }
-            } catch(e){}
+            } catch(e) {}
         }
 
         function renderUsersList() {
@@ -1169,7 +1054,7 @@
             var action = editKey ? 'updateUser' : 'addUser';
             var payload = { action: action, user: { usuario: login, nome: nome, nivel: nivel, senha: senha, ativo: 'sim' } };
 
-            var res = await enviar(payload);
+            var res = await enviarAcaoOnline(payload);
             if (res && res.status === 'ok') {
                 alert('✅ Usuário salvo no Google Drive!');
                 resetUserForm();
@@ -1181,7 +1066,7 @@
 
         async function deleteUserClick(login) {
             if (!confirm(`Excluir o usuário @${login}?`)) return;
-            var res = await enviar({ action: 'deleteUser', usuario: login });
+            var res = await enviarAcaoOnline({ action: 'deleteUser', usuario: login });
             if (res && res.status === 'ok') {
                 alert('🗑️ Usuário removido!');
                 carregarUsuarios();
@@ -1199,7 +1084,13 @@
             var container = document.getElementById('checklistCategoriesContainer');
             var items = db[currentPerson] || [];
             
-            atualizarChecklistProgresso();
+            var totalItems = items.length;
+            var okItems = items.filter(i => i.situacao === 'OK').length;
+            var pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
+
+            document.getElementById('checklistPctText').innerText = pct + '%';
+            document.getElementById('checklistProgressBar').style.width = pct + '%';
+            document.getElementById('checklistCountText').innerText = `${okItems}/${totalItems} itens verificados`;
 
             container.innerHTML = categories.map(cat => {
                 var catItems = items.filter(i => i.categoria === cat);
@@ -1221,8 +1112,8 @@
                                 var isOk = i.situacao === 'OK';
                                 return `
                                     <div class="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                                        <label id="lbl_${i.id}" class="flex items-center space-x-3 cursor-pointer select-none flex-1">
-                                            <input type="checkbox" ${isOk ? 'checked' : ''} onchange="toggleChecklistItem('${i.id}', document.getElementById('lbl_${i.id}'))" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600">
+                                        <label class="flex items-center space-x-3 cursor-pointer select-none flex-1">
+                                            <input type="checkbox" ${isOk ? 'checked' : ''} onchange="toggleChecklistItem('${i.id}')" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600">
                                             <span class="item-title font-bold text-xs sm:text-sm ${isOk ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}">
                                                 ${i.produto}
                                             </span>
@@ -1247,20 +1138,10 @@
 
         function openSettingsModal() {
             document.getElementById('cfg-url').value = scriptUrl;
-            document.getElementById('appVersionDisplay').innerText = 'v' + obterVersaoApp();
             document.getElementById('settingsModal').classList.remove('hidden');
             document.getElementById('settingsModal').classList.add('flex');
         }
         function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('flex'); document.getElementById('settingsModal').classList.add('hidden'); }
-
-        async function salvarUrl() {
-            var url = document.getElementById('cfg-url').value.trim();
-            if (!url.startsWith('https://script.google.com')) { alert('URL inválida'); return; }
-            scriptUrl = url;
-            salvarLocal();
-            document.getElementById('cfg-txt').innerText = 'Status: Salvo!';
-            sincronizar();
-        }
 
         function toggleDarkMode() {
             document.documentElement.classList.toggle('dark');

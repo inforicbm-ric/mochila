@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="2.0.1">
+    <meta name="app-version" content="2.0.2">
     <title>Mochila de Emergência Inteligente - Online</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -374,7 +374,7 @@
                 </div>
                 <div class="pt-3 border-t border-foxit-border dark:border-slate-700 flex items-center justify-between text-slate-500 dark:text-slate-400">
                     <span>Versão Atual do Aplicativo:</span>
-                    <span id="appVersionDisplay" class="font-bold text-foxit-orange bg-foxit-orange/10 px-2 py-0.5 rounded">v2.0.0</span>
+                    <span id="appVersionDisplay" class="font-bold text-foxit-orange bg-foxit-orange/10 px-2 py-0.5 rounded">Carregando...</span>
                 </div>
             </div>
             <div class="flex justify-end pt-3 mt-4 border-t border-foxit-border dark:border-slate-700">
@@ -417,7 +417,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT 100% ONLINE (v2.0.0) -->
+    <!-- SCRIPT 100% ONLINE (v2.0.2) -->
     <script>
         var categories = ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
         var db = {};
@@ -427,6 +427,12 @@
         var statusFilter = "TODAS";
         var onlineSyncInterval = null;
         var usersCache = [];
+        var isSavingData = false; // Trava de segurança para impedir sobrescrita enquanto grava no Google Sheets
+
+        function obterVersaoApp() {
+            var metaTag = document.querySelector('meta[name="app-version"]');
+            return metaTag ? metaTag.getAttribute('content') : '2.0.2';
+        }
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
 
@@ -539,15 +545,15 @@
 
         function iniciarTempoReal() {
             clearInterval(onlineSyncInterval);
-            // Sincroniza automaticamente a cada 5 segundos buscando direto do Google Sheets
+            // Sincroniza automaticamente a cada 2 segundos buscando direto do Google Sheets
             onlineSyncInterval = setInterval(function() {
-                if (!scriptUrl || !navigator.onLine) return;
+                if (!scriptUrl || !navigator.onLine || isSavingData) return;
                 carregarDadosOnline(false);
             }, 2000);
         }
 
         async function carregarDadosOnline(animarIcone) {
-            if (!scriptUrl) return;
+            if (!scriptUrl || isSavingData) return;
             var icon = document.getElementById('syncIcon');
             if (animarIcone && icon) icon.classList.add('fa-spin');
 
@@ -580,7 +586,12 @@
         }
 
         async function salvarAlteracoesNuvem() {
+            isSavingData = true;
             await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
+            // Aguarda meio segundo para garantir que o Google Sheets processou a gravação
+            setTimeout(function() {
+                isSavingData = false;
+            }, 500);
             render();
         }
 
@@ -1085,80 +1096,4 @@
             var items = db[currentPerson] || [];
             
             var totalItems = items.length;
-            var okItems = items.filter(i => i.situacao === 'OK').length;
-            var pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
-
-            document.getElementById('checklistPctText').innerText = pct + '%';
-            document.getElementById('checklistProgressBar').style.width = pct + '%';
-            document.getElementById('checklistCountText').innerText = `${okItems}/${totalItems} itens verificados`;
-
-            container.innerHTML = categories.map(cat => {
-                var catItems = items.filter(i => i.categoria === cat);
-                if (!catItems.length) return '';
-                var catOk = catItems.filter(i => i.situacao === 'OK').length;
-
-                return `
-                    <div class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-                        <div class="bg-[#f0f4f8] dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                            <span class="font-extrabold text-xs sm:text-sm uppercase text-slate-800 dark:text-slate-100 flex items-center">
-                                <i class="fa-solid fa-folder text-foxit-orange mr-2 text-base"></i> ${cat}
-                            </span>
-                            <span class="px-2.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md font-bold text-xs text-slate-700 dark:text-slate-300">
-                                ${catOk}/${catItems.length}
-                            </span>
-                        </div>
-                        <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
-                            ${catItems.map(i => {
-                                var isOk = i.situacao === 'OK';
-                                return `
-                                    <div class="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                                        <label class="flex items-center space-x-3 cursor-pointer select-none flex-1">
-                                            <input type="checkbox" ${isOk ? 'checked' : ''} onchange="toggleChecklistItem('${i.id}')" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600">
-                                            <span class="item-title font-bold text-xs sm:text-sm ${isOk ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}">
-                                                ${i.produto}
-                                            </span>
-                                        </label>
-                                        <span class="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                            Qtd: ${i.quantidade || 1}
-                                        </span>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function closeChecklistModal() {
-            document.getElementById('checklistModal').classList.remove('flex');
-            document.getElementById('checklistModal').classList.add('hidden');
-            render();
-        }
-
-        function openSettingsModal() {
-            document.getElementById('cfg-url').value = scriptUrl;
-            document.getElementById('settingsModal').classList.remove('hidden');
-            document.getElementById('settingsModal').classList.add('flex');
-        }
-        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('flex'); document.getElementById('settingsModal').classList.add('hidden'); }
-
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-        }
-        if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
-
-        function toggleMobileSidebar() {
-            document.getElementById('appSidebar').classList.toggle('-translate-x-full');
-            document.getElementById('sidebarBackdrop').classList.toggle('hidden');
-        }
-
-        function exportToPDF() {
-            var element = document.createElement('div');
-            element.innerHTML = `<h1 style="font-size:18px;color:#f96302;">Mochila de Emergência - ${currentPerson}</h1><p>Total de itens: ${(db[currentPerson]||[]).length}</p>`;
-            html2pdf().from(element).save(`Mochila_${currentPerson}.pdf`);
-        }
-    </script>
-</body>
-</html>
+            var okItems = items.filter(

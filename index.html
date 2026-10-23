@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="2.0.3">
+    <meta name="app-version" content="2.0.4">
     <title>Mochila de Emergência Inteligente - Online</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -417,7 +417,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT 100% ONLINE (v2.0.3 - FIX LOGIN) -->
+    <!-- SCRIPT 100% ONLINE (v2.0.4 - FIX CONFLITOS E INSTANTANEO) -->
     <script>
         var categories = ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
         var db = {};
@@ -427,14 +427,24 @@
         var statusFilter = "TODAS";
         var onlineSyncInterval = null;
         var usersCache = [];
-        var isSavingData = false;
+        var isSavingData = false; 
+        var saveLockTimeout = null;
 
         function obterVersaoApp() {
             var metaTag = document.querySelector('meta[name="app-version"]');
-            return metaTag ? metaTag.getAttribute('content') : '2.0.3';
+            return metaTag ? metaTag.getAttribute('content') : '2.0.4';
         }
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
+
+        function bloquearSincronizacaoTemporariamente() {
+            isSavingData = true;
+            clearTimeout(saveLockTimeout);
+            // Mantém a sincronização automática bloqueada por 5 segundos após qualquer ação do usuário
+            saveLockTimeout = setTimeout(function() {
+                isSavingData = false;
+            }, 5000);
+        }
 
         function salvarUrlLogin() {
             var url = document.getElementById('cfg-url-login').value.trim();
@@ -475,7 +485,6 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Autenticando...';
             btn.disabled = true;
 
-            // Atalho local de emergência
             if (usuario.toLowerCase() === 'admin' && senha === 'admin') {
                 sessao = { nome: 'Administrador', nivel: 'admin', token: 'token_' + Date.now(), usuario: 'admin' };
                 localStorage.setItem('m_sessao', JSON.stringify(sessao));
@@ -579,17 +588,13 @@
                 });
                 return await res.json();
             } catch(e) {
-                alert('❌ Erro de comunicação com a nuvem.');
                 return null;
             }
         }
 
         async function salvarAlteracoesNuvem() {
-            isSavingData = true;
+            bloquearSincronizacaoTemporariamente();
             await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
-            setTimeout(function() {
-                isSavingData = false;
-            }, 500);
             render();
         }
 

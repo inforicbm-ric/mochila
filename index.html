@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="2.0.7">
+    <meta name="app-version" content="2.0.9">
     <title>Mochila de Emergência Inteligente - Online</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -64,7 +64,7 @@
                 <i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema
             </button>
 
-            <!-- Configuração da URL (Privada do Dispositivo) -->
+            <!-- Configuração da URL -->
             <div class="mt-4 pt-3 border-t border-foxit-border dark:border-slate-700">
                 <p class="text-[11px] text-slate-600 dark:text-slate-300 font-bold mb-1"><i class="fa-solid fa-link mr-1 text-foxit-orange"></i> URL do Web App (Google Sheets):</p>
                 <div class="flex gap-1.5">
@@ -87,8 +87,8 @@
                     <span id="user-chip" class="text-[11px] bg-foxit-orange/20 text-foxit-orange font-bold px-2 py-0.5 rounded">👤 Usuário</span>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button onclick="carregarDadosOnline(true)" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Sincronizar agora">
-                        <i id="syncIcon" class="fa-solid fa-rotate"></i>
+                    <button onclick="carregarDadosOnline(true)" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Sincronizar dados agora">
+                        <i id="syncIcon" class="fa-solid fa-rotate"></i> Sincronizar
                     </button>
                     <button onclick="toggleDarkMode()" class="text-slate-600 dark:text-slate-300 hover:text-foxit-orange transition" title="Alternar Modo Escuro">
                         <i id="themeIcon" class="fa-solid fa-moon"></i>
@@ -169,7 +169,7 @@
                             <div>
                                 <div class="flex items-center space-x-2">
                                     <i class="fa-solid fa-clipboard-list text-foxit-orange text-lg"></i>
-                                    <h2 id="currentPersonName" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Carregando...</h2>
+                                    <h2 id="currentPersonName" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">MOCHILA</h2>
                                     <span id="personBadge" class="px-2 py-0.5 text-[10px] font-bold bg-foxit-orange/15 text-foxit-orange border border-foxit-orange/30 rounded uppercase">Documento Ativo</span>
                                 </div>
                             </div>
@@ -243,7 +243,7 @@
                     </div>
 
                     <div class="p-2.5 bg-[#f0f0f0] dark:bg-[#252525] border-t border-foxit-border dark:border-foxit-darkBorder flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                        <span>Conectado em tempo real ao Google Sheets</span>
+                        <span>Conectado ao Google Sheets</span>
                     </div>
                 </div>
             </main>
@@ -345,7 +345,7 @@
                     <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Validade (Opcional)</label>
                     <div class="flex gap-2">
                         <input type="date" id="inputValidadeCalendar" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" onchange="document.getElementById('inputValidadeText').value = formatarIsoParaBr(this.value)">
-                        <input type="text" id="inputValidadeText" placeholder="DD/MM/AAAA ou escolha no lado" maxlength="10" class="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" oninput="mascaraDataValidade(this)">
+                        <input type="text" id="inputValidadeText" placeholder="DD/MM/AAAA" maxlength="10" class="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-700 border border-foxit-border rounded text-xs text-slate-800 dark:text-white" oninput="mascaraDataValidade(this)">
                     </div>
                 </div>
                 <div class="flex justify-end space-x-2 pt-3 border-t border-foxit-border dark:border-slate-700">
@@ -356,7 +356,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIGURAÇÕES -->
+    <!-- CONFIGURAÇÕES -->
     <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
         <div class="bg-white dark:bg-slate-800 rounded border border-foxit-border dark:border-foxit-darkBorder max-w-md w-full p-5 shadow-xl">
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-foxit-border dark:border-slate-700">
@@ -417,7 +417,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT 100% ONLINE (v2.0.7 - SINCRONIZACAO DIRETA NUVEM) -->
+    <!-- SCRIPT v2.0.9 (Anti-Travamento e Sincronização Estável) -->
     <script>
         var categories = ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
         var db = {};
@@ -425,13 +425,11 @@
         var sessao = JSON.parse(localStorage.getItem('m_sessao') || 'null');
         var currentPerson = "";
         var statusFilter = "TODAS";
-        var onlineSyncInterval = null;
         var usersCache = [];
-        var isSavingData = false; 
 
         function obterVersaoApp() {
             var metaTag = document.querySelector('meta[name="app-version"]');
-            return metaTag ? metaTag.getAttribute('content') : '2.0.7';
+            return metaTag ? metaTag.getAttribute('content') : '2.0.9';
         }
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
@@ -502,7 +500,7 @@
                     mostrarErroLogin(data.message || 'Usuário ou senha incorretos.');
                 }
             } catch(e) {
-                mostrarErroLogin('Erro ao conectar à URL. Verifique o link salvo abaixo.');
+                mostrarErroLogin('Erro ao conectar à URL. Verifique o link salvo.');
             }
 
             btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-1.5"></i> Entrar no Sistema';
@@ -519,7 +517,6 @@
             if (!confirm('Deseja sair do aplicativo?')) return;
             sessao = null;
             localStorage.removeItem('m_sessao');
-            clearInterval(onlineSyncInterval);
             document.getElementById('main-app').style.display = 'none';
             document.getElementById('login-wrap').style.display = 'flex';
             document.getElementById('l-user').value = '';
@@ -539,25 +536,15 @@
             document.getElementById('main-app').style.display = 'flex';
             aplicarPermissoesInterface();
             await carregarDadosOnline(true);
-            iniciarTempoReal();
-        }
-
-        function iniciarTempoReal() {
-            clearInterval(onlineSyncInterval);
-            // Sincroniza a cada 3 segundos de forma totalmente limpa
-            onlineSyncInterval = setInterval(function() {
-                if (!scriptUrl || !navigator.onLine || isSavingData) return;
-                carregarDadosOnline(false);
-            }, 3000);
         }
 
         async function carregarDadosOnline(animarIcone) {
-            if (!scriptUrl || isSavingData) return;
+            if (!scriptUrl) { alert('Configure a URL do Google Sheets nas Configurações.'); return; }
             var icon = document.getElementById('syncIcon');
             if (animarIcone && icon) icon.classList.add('fa-spin');
 
             try {
-                var res = await fetch(scriptUrl + '?action=getAll', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+                var res = await fetch(scriptUrl + '?action=getAll', { cache: 'no-store' });
                 var data = await res.json();
                 if (data && data.status === 'ok') {
                     if (data.db && Object.keys(data.db).length > 0) {
@@ -567,8 +554,12 @@
                         categories = data.categories;
                     }
                     render();
+                } else {
+                    alert('Erro ao carregar dados do Google Sheets.');
                 }
-            } catch(e) {}
+            } catch(e) {
+                alert('Falha de conexão com a planilha.');
+            }
 
             if (animarIcone && icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
         }
@@ -588,11 +579,10 @@
         }
 
         async function salvarAlteracoesNuvem() {
-            isSavingData = true;
-            await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
-            // Força busca imediata fresca após salvar para alinhar com a planilha
-            await carregarDadosOnline(false);
-            isSavingData = false;
+            var res = await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
+            if (!res || res.status !== 'ok') {
+                alert('⚠️ Atenção: ' + (res ? res.message : 'Erro ao salvar na nuvem.'));
+            }
             render();
         }
 

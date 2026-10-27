@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-version" content="2.0.4">
+    <meta name="app-version" content="2.0.7">
     <title>Mochila de Emergência Inteligente - Online</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f96302">
@@ -417,7 +417,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT 100% ONLINE (v2.0.4 - FIX CONFLITOS E INSTANTANEO) -->
+    <!-- SCRIPT 100% ONLINE (v2.0.7 - SINCRONIZACAO DIRETA NUVEM) -->
     <script>
         var categories = ["SUPRIMENTOS","P.SOCORROS E HIGIENE","VESTUÁRIO","EQUIPAMENTOS","OUTROS","ADICIONAIS"];
         var db = {};
@@ -428,23 +428,13 @@
         var onlineSyncInterval = null;
         var usersCache = [];
         var isSavingData = false; 
-        var saveLockTimeout = null;
 
         function obterVersaoApp() {
             var metaTag = document.querySelector('meta[name="app-version"]');
-            return metaTag ? metaTag.getAttribute('content') : '2.0.4';
+            return metaTag ? metaTag.getAttribute('content') : '2.0.7';
         }
 
         function isAdmin() { return sessao && sessao.nivel === 'admin'; }
-
-        function bloquearSincronizacaoTemporariamente() {
-            isSavingData = true;
-            clearTimeout(saveLockTimeout);
-            // Mantém a sincronização automática bloqueada por 5 segundos após qualquer ação do usuário
-            saveLockTimeout = setTimeout(function() {
-                isSavingData = false;
-            }, 5000);
-        }
 
         function salvarUrlLogin() {
             var url = document.getElementById('cfg-url-login').value.trim();
@@ -554,10 +544,11 @@
 
         function iniciarTempoReal() {
             clearInterval(onlineSyncInterval);
+            // Sincroniza a cada 3 segundos de forma totalmente limpa
             onlineSyncInterval = setInterval(function() {
                 if (!scriptUrl || !navigator.onLine || isSavingData) return;
                 carregarDadosOnline(false);
-            }, 2000);
+            }, 3000);
         }
 
         async function carregarDadosOnline(animarIcone) {
@@ -569,8 +560,12 @@
                 var res = await fetch(scriptUrl + '?action=getAll', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
                 var data = await res.json();
                 if (data && data.status === 'ok') {
-                    if (data.db) db = data.db;
-                    if (Array.isArray(data.categories) && data.categories.length) categories = data.categories;
+                    if (data.db && Object.keys(data.db).length > 0) {
+                        db = data.db;
+                    }
+                    if (Array.isArray(data.categories) && data.categories.length > 0) {
+                        categories = data.categories;
+                    }
                     render();
                 }
             } catch(e) {}
@@ -593,8 +588,11 @@
         }
 
         async function salvarAlteracoesNuvem() {
-            bloquearSincronizacaoTemporariamente();
+            isSavingData = true;
             await enviarAcaoOnline({ action: 'saveAll', db: db, categories: categories });
+            // Força busca imediata fresca após salvar para alinhar com a planilha
+            await carregarDadosOnline(false);
+            isSavingData = false;
             render();
         }
 
